@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Secuencia para el campo name -->
+    <record id="seq_productos_cotizar" model="ir.sequence">
+        <field name="name">Productos a Cotizar</field>
+        <field name="code">productos.cotizar</field>
+        <field name="prefix">SOL/%(year)s/</field>
+        <field name="padding">5</field>
+    </record>
+
+    <!-- ==================== LIST VIEW ==================== -->
+    <record id="productos_cotizar_list_view" model="ir.ui.view">
+        <field name="name">productos.cotizar.list</field>
+        <field name="model">productos.cotizar</field>
+        <field name="arch" type="xml">
+            <list string="Productos a Cotizar" multi_edit="1">
+                <field name="name" readonly="1"/>
+                <field name="date"/>
+                <field name="product_id"/>
+                <field name="quantity"/>
+                <field name="supplier_id"/>
+                <field name="currency_id"/>
+                <field name="purchase_price_initial"/>
+                <field name="purchase_price_final"/>
+                <field name="sale_order_id"/>
+                <field name="partner_id"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="stage" widget="badge"
+                    decoration-info="stage == 'borrador'"
+                    decoration-warning="stage == 'solicitado'"
+                    decoration-success="stage in ('cotizado', 'listo')"/>
+                <field name="priority" widget="priority"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ==================== FORM VIEW ==================== -->
+    <record id="productos_cotizar_form_view" model="ir.ui.view">
+        <field name="name">productos.cotizar.form</field>
+        <field name="model">productos.cotizar</field>
+        <field name="arch" type="xml">
+            <form string="Solicitud de Cotización">
+                <header>
+                    <button name="action_create_purchase_orders"
+                        string="Crear Orden de Compra"
+                        type="object"
+                        class="oe_highlight"
+                        invisible="stage != 'solicitado'"
+                        groups="purchase.group_purchase_user"/>
+                    <field name="stage" widget="statusbar"
+                        statusbar_visible="borrador,solicitado,cotizado,listo"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="General">
+                            <field name="product_id"/>
+                            <field name="quantity"/>
+                            <field name="priority" widget="priority"/>
+                            <field name="date"/>
+                            <field name="date_start"/>
+                            <field name="date_stop"/>
+                            <field name="date_done"/>
+                        </group>
+                        <group string="Proveedor">
+                            <field name="supplier_id"/>
+                            <field name="lead_time"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Compras">
+                            <field name="currency_id"/>
+                            <field name="exchange_rate"/>
+                            <field name="purchase_price_initial"/>
+                            <field name="margin"/>
+                            <field name="purchase_price_final"/>
+                            <field name="purchase_order_id"/>
+                            <field name="purchase_line_id"/>
+                        </group>
+                        <group string="Ventas">
+                            <field name="sale_currency_id"/>
+                            <field name="sale_value_calc"/>
+                            <field name="sale_order_id"/>
+                            <field name="sale_line_id"/>
+                            <field name="partner_id"/>
+                            <field name="pricelist_id"/>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ==================== KANBAN VIEW ==================== -->
+    <!-- Por qué: Kanban agrupado por stage es el flujo principal para compradores.
+         group_expand en el modelo garantiza que todas las columnas se muestren. -->
+    <record id="productos_cotizar_kanban_view" model="ir.ui.view">
+        <field name="name">productos.cotizar.kanban</field>
+        <field name="model">productos.cotizar</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="stage" class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="product_id"/>
+                <field name="supplier_id"/>
+                <field name="quantity"/>
+                <field name="purchase_price_initial"/>
+                <field name="currency_id"/>
+                <field name="stage"/>
+                <field name="priority"/>
+                <field name="user_id"/>
+                <field name="partner_id"/>
+                <progressbar field="priority"
+                    colors='{"1": "danger", "0": "muted"}'/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between">
+                            <field name="priority" widget="priority"/>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                        </div>
+                        <field name="name" class="fw-bold"/>
+                        <field name="product_id"/>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span>Cant: <field name="quantity"/></span>
+                            <span>
+                                <field name="purchase_price_initial"/>
+                                <field name="currency_id"/>
+                            </span>
+                        </div>
+                        <div class="text-muted small" t-if="record.supplier_id.value">
+                            Prov: <field name="supplier_id"/>
+                        </div>
+                        <div class="text-muted small" t-if="record.partner_id.value">
+                            Cliente: <field name="partner_id"/>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ==================== SEARCH VIEW ==================== -->
+    <record id="productos_cotizar_search_view" model="ir.ui.view">
+        <field name="name">productos.cotizar.search</field>
+        <field name="model">productos.cotizar</field>
+        <field name="arch" type="xml">
+            <search string="Buscar Solicitudes">
+                <field name="name"/>
+                <field name="product_id"/>
+                <field name="supplier_id"/>
+                <field name="partner_id"/>
+                <field name="sale_order_id"/>
+                <field name="user_id"/>
+                <filter name="filter_borrador" string="Borrador"
+                    domain="[('stage', '=', 'borrador')]"/>
+                <filter name="filter_solicitado" string="Solicitado"
+                    domain="[('stage', '=', 'solicitado')]"/>
+                <filter name="filter_cotizado" string="Cotizado"
+                    domain="[('stage', '=', 'cotizado')]"/>
+                <filter name="filter_listo" string="Listo"
+                    domain="[('stage', '=', 'listo')]"/>
+                <separator/>
+                <filter name="filter_urgente" string="Urgentes"
+                    domain="[('priority', '=', '1')]"/>
+                <separator/>
+                <!-- Odoo 19: <group> no va dentro de <search>, filtros group_by van directo -->
+                <filter name="group_stage" string="Etapa"
+                    context="{'group_by': 'stage'}"/>
+                <filter name="group_supplier" string="Proveedor"
+                    context="{'group_by': 'supplier_id'}"/>
+                <filter name="group_product" string="Producto"
+                    context="{'group_by': 'product_id'}"/>
+                <filter name="group_user" string="Vendedor"
+                    context="{'group_by': 'user_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ==================== ACTION ==================== -->
+    <record id="action_productos_cotizar" model="ir.actions.act_window">
+        <field name="name">Productos a Cotizar</field>
+        <field name="res_model">productos.cotizar</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="productos_cotizar_search_view"/>
+        <field name="context">{'search_default_filter_solicitado': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay solicitudes de cotización
+            </p>
+            <p>
+                Los vendedores crean solicitudes desde las líneas de presupuesto.
+            </p>
+        </field>
+    </record>
+
+</odoo>
