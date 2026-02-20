@@ -1,25 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Por qué: Agrega botón "Solic. Coti." en la lista embebida de líneas
-         del formulario de sale.order. Permite al vendedor solicitar cotización
-         sin salir del presupuesto.
-         Patrón: xpath inside en la vista form de sale.order apuntando al
-         tree/list embebido de order_line. -->
+    <!-- Por qué: Reemplaza el botón por toggles booleanos en la lista embebida
+         de líneas del formulario de sale.order. El vendedor activa el toggle
+         y automáticamente se crea el registro en productos.cotizar.
+         Patrón: xpath inside en la vista form de sale.order. -->
     <record id="sale_order_form_inherit_productos_cotizar" model="ir.ui.view">
         <field name="name">sale.order.form.inherit.productos.cotizar</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <!-- Agregar botón en la lista embebida de líneas -->
+            <!-- Agregar toggles en la lista embebida de líneas, después de price_unit -->
             <xpath expr="//field[@name='order_line']//list//field[@name='price_subtotal']"
-                   position="after">
-                <button name="action_solicitar_cotizacion"
-                    string="Solic. Coti."
-                    type="object"
-                    icon="fa-shopping-cart"
-                    title="Solicitar cotización al área de compras"
-                    class="btn-link"/>
+                   position="before">
+                <field name="solicitar_cotizacion" widget="boolean_toggle"/>
+                <field name="precio_actual"/>
             </xpath>
         </field>
     </record>

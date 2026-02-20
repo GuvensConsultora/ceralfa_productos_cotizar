@@ -2,12 +2,11 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
 
-# Por qué: Selection con group_expand para que kanban muestre todas las columnas
-# aunque estén vacías. Patrón estándar Odoo para flujos tipo pipeline.
+# Por qué: 3 estados según flujo real del cliente:
+# Nuevo → En progreso (RFQ creada) → Listo (precio devuelto al SO)
 STAGE_SELECTION = [
-    ("borrador", "Borrador"),
-    ("solicitado", "Solicitado"),
-    ("cotizado", "Cotizado"),
+    ("nuevo", "Nuevo"),
+    ("en_progreso", "En progreso"),
     ("listo", "Listo"),
 ]
 
@@ -29,7 +28,7 @@ class ProductosCotizar(models.Model):
     stage = fields.Selection(
         selection=STAGE_SELECTION,
         string="Etapa",
-        default="borrador",
+        default="nuevo",
         required=True,
         tracking=True,
         group_expand="_group_expand_stage",
@@ -40,39 +39,51 @@ class ProductosCotizar(models.Model):
         default="0",
     )
     date = fields.Datetime(
-        string="Fecha solicitud",
+        string="Fecha",
         default=fields.Datetime.now,
     )
-    date_start = fields.Date(string="Fecha inicio")
-    date_stop = fields.Date(string="Fecha límite")
-    date_done = fields.Date(string="Fecha finalización")
+    # Por qué: Datetime en vez de Date porque el cliente necesita ver timestamps con hora
+    date_start = fields.Datetime(string="Periodo inicio")
+    date_stop = fields.Datetime(string="Periodo fin")
+    date_done = fields.Date(string="Fecha en listo")
     product_id = fields.Many2one(
         "product.product",
         string="Producto",
         required=True,
         tracking=True,
     )
+    # Por qué: Categoría del producto, related stored para filtrar/agrupar en vistas
+    category_id = fields.Many2one(
+        "product.category",
+        related="product_id.categ_id",
+        store=True,
+        string="Categoría",
+    )
+    description = fields.Text(
+        string="Descripción",
+        related="product_id.name",
+    )
     quantity = fields.Float(string="Cantidad", default=1.0)
-    supplier_id = fields.Many2one(
-        "res.partner",
-        string="Proveedor",
-        tracking=True,
-        domain="[('supplier_rank', '>', 0)]",
+    company_id = fields.Many2one(
+        "res.company",
+        string="Compañía",
+        default=lambda self: self.env.company,
     )
 
     # --- Sección compras ---
     currency_id = fields.Many2one(
         "res.currency",
-        string="Moneda compra",
+        string="Divisa Compra",
     )
     exchange_rate = fields.Float(
         string="Tipo de cambio",
         digits=(12, 6),
     )
     lead_time = fields.Integer(string="Plazo entrega (días)")
+    date_delivery = fields.Date(string="Fecha entrega")
     purchase_order_id = fields.Many2one(
         "purchase.order",
-        string="Orden de compra",
+        string="Presupuesto Compra",
         readonly=True,
         copy=False,
     )
@@ -83,17 +94,19 @@ class ProductosCotizar(models.Model):
         copy=False,
     )
     purchase_price_initial = fields.Float(
-        string="Precio compra inicial",
+        string="Valor Compra Inicial",
         digits="Product Price",
     )
+    # Por qué: Margen es multiplicador directo, no porcentaje.
+    # Ej: 1.20 = precio * 1.20 (+20%)
     margin = fields.Float(
-        string="Margen (%)",
+        string="Margen",
         digits=(5, 2),
     )
-    # Por qué: Precio final calculado como precio inicial + margen.
+    # Por qué: Precio final = precio inicial * margen (multiplicador directo)
     # Computed stored para poder filtrar/agrupar en vistas.
     purchase_price_final = fields.Float(
-        string="Precio compra final",
+        string="Valor Compra Final",
         digits="Product Price",
         compute="_compute_purchase_price_final",
         store=True,
@@ -102,11 +115,11 @@ class ProductosCotizar(models.Model):
     # --- Sección ventas ---
     sale_currency_id = fields.Many2one(
         "res.currency",
-        string="Moneda venta",
+        string="Divisa Venta",
     )
     sale_order_id = fields.Many2one(
         "sale.order",
-        string="Presupuesto",
+        string="Presupuesto Ventas",
         readonly=True,
     )
     sale_line_id = fields.Many2one(
@@ -115,7 +128,7 @@ class ProductosCotizar(models.Model):
         readonly=True,
     )
     sale_value_calc = fields.Float(
-        string="Valor venta calculado",
+        string="Val Vtas Calc",
         digits="Product Price",
     )
     partner_id = fields.Many2one(
@@ -124,7 +137,7 @@ class ProductosCotizar(models.Model):
     )
     pricelist_id = fields.Many2one(
         "product.pricelist",
-        string="Lista de precios",
+        string="Lista de Precios",
     )
     user_id = fields.Many2one(
         "res.users",
@@ -137,18 +150,20 @@ class ProductosCotizar(models.Model):
 
     @api.depends("purchase_price_initial", "margin")
     def _compute_purchase_price_final(self):
-        """Precio final = precio inicial * (1 + margen/100)"""
+        """Precio final = precio inicial * margen (multiplicador directo).
+
+        Por qué: El cliente usa margen como multiplicador (1.20 = +20%),
+        no como porcentaje aditivo.
+        """
         for rec in self:
             if rec.purchase_price_initial and rec.margin:
-                rec.purchase_price_final = rec.purchase_price_initial * (
-                    1 + rec.margin / 100
-                )
+                rec.purchase_price_final = rec.purchase_price_initial * rec.margin
             else:
                 rec.purchase_price_final = rec.purchase_price_initial
 
     # --- group_expand ---
-    # Por qué: Kanban necesita mostrar todas las columnas del pipeline
-    # aunque no tengan registros. group_expand se llama al agrupar por stage.
+    # Por qué: Kanban/lista agrupada necesita mostrar todas las columnas
+    # del pipeline aunque estén vacías.
     @api.model
     def _group_expand_stage(self, stages, domain):
         return [key for key, _ in STAGE_SELECTION]
@@ -165,41 +180,42 @@ class ProductosCotizar(models.Model):
                 ) or _("Nuevo")
         return super().create(vals_list)
 
-    # --- Acción principal: crear órdenes de compra ---
-    # Patrón: Agrupación por (proveedor, moneda) para crear 1 PO por combinación.
-    # Esto evita múltiples POs al mismo proveedor cuando hay varias solicitudes.
+    # --- Acción: crear RFQ agrupadas por moneda ---
+    # Por qué: El comprador selecciona items en "Nuevo" y desde Actions crea RFQs.
+    # Se usa la empresa propia como vendor temporal; el comprador cambia el proveedor
+    # manualmente en el form de la RFQ.
     def action_create_purchase_orders(self):
-        """Crea purchase.order agrupadas por proveedor + moneda.
-        Cada solicitud se convierte en una línea de la PO correspondiente.
-        """
-        # Validar que todas tengan proveedor y moneda
-        for rec in self:
-            if not rec.supplier_id:
-                raise UserError(
-                    _("La solicitud '%s' no tiene proveedor asignado.") % rec.name
-                )
-            if not rec.currency_id:
-                raise UserError(
-                    _("La solicitud '%s' no tiene moneda de compra.") % rec.name
-                )
+        """Crea purchase.order agrupadas por moneda.
 
-        # Agrupar por (proveedor, moneda)
+        Flujo: Vendedor tilda toggle → Comprador selecciona items Nuevo →
+        Actions → Crear cotizaciones → Se crean RFQ con empresa propia como
+        vendor temporal → Estado pasa a "en_progreso".
+        """
+        # Filtrar solo registros en estado "nuevo"
+        recs_nuevo = self.filtered(lambda r: r.stage == "nuevo")
+        if not recs_nuevo:
+            raise UserError(
+                _("Solo se pueden crear cotizaciones para registros en estado 'Nuevo'.")
+            )
+
+        # Agrupar por moneda (el vendor se asigna después manualmente)
         groups = {}
-        for rec in self:
-            key = (rec.supplier_id.id, rec.currency_id.id)
-            groups.setdefault(key, self.browse())
-            groups[key] |= rec
+        company_partner = self.env.company.partner_id
+        for rec in recs_nuevo:
+            currency = rec.currency_id or self.env.company.currency_id
+            groups.setdefault(currency.id, self.browse())
+            groups[currency.id] |= rec
 
         created_orders = self.env["purchase.order"]
-        for (supplier_id, currency_id), recs in groups.items():
-            # Crear PO
+        for currency_id, recs in groups.items():
+            # Por qué: Se usa la empresa propia como partner temporal.
+            # El comprador cambia el proveedor en el form de la RFQ.
             po = self.env["purchase.order"].create(
                 {
-                    "partner_id": supplier_id,
+                    "partner_id": company_partner.id,
                     "currency_id": currency_id,
                 }
             )
-            # Crear líneas
             for rec in recs:
                 pol = self.env["purchase.order.line"].create(
                     {
@@ -209,12 +225,11 @@ class ProductosCotizar(models.Model):
                         "price_unit": rec.purchase_price_initial or 0.0,
                     }
                 )
-                # Linkear solicitud → PO y línea
                 rec.write(
                     {
                         "purchase_order_id": po.id,
                         "purchase_line_id": pol.id,
-                        "stage": "cotizado",
+                        "stage": "en_progreso",
                     }
                 )
             created_orders |= po
@@ -235,3 +250,45 @@ class ProductosCotizar(models.Model):
             "view_mode": "list,form",
             "target": "current",
         }
+
+    # --- Acción: importar precio de la PO line ---
+    def action_import_purchase_price(self):
+        """Lee precio de la línea de PO vinculada y lo copia a purchase_price_initial.
+
+        Por qué: Después de que el proveedor responde la RFQ, el comprador
+        importa el precio sin tipear manualmente.
+        """
+        for rec in self:
+            if rec.stage != "en_progreso":
+                continue
+            if not rec.purchase_line_id:
+                continue
+            price = rec.purchase_line_id.price_unit
+            if price > 0.0:
+                rec.purchase_price_initial = price
+
+    # --- Acción: Botón Listo ---
+    def action_boton_listo(self):
+        """Calcula precio de venta y lo devuelve a la línea del presupuesto.
+
+        Flujo: purchase_price_initial * margin → sale_value_calc →
+        sale_line_id.price_unit. Estado pasa a "listo".
+        """
+        for rec in self:
+            if rec.stage != "en_progreso":
+                continue
+            if not rec.margin:
+                raise UserError(
+                    _("La solicitud '%s' no tiene margen asignado.") % rec.name
+                )
+            # Calcular valor venta = precio compra * margen (multiplicador)
+            sale_value = rec.purchase_price_initial * rec.margin
+            vals = {
+                "sale_value_calc": sale_value,
+                "stage": "listo",
+                "date_done": fields.Date.today(),
+            }
+            rec.write(vals)
+            # Devolver precio a la línea del presupuesto de venta
+            if rec.sale_line_id:
+                rec.sale_line_id.price_unit = sale_value

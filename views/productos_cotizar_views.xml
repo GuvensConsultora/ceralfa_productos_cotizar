@@ -10,87 +10,105 @@
     </record>
 
     <!-- ==================== LIST VIEW ==================== -->
+    <!-- Por qué: Columnas según requerimiento del cliente, ordenadas para
+         flujo de compras con información de ventas al final. -->
     <record id="productos_cotizar_list_view" model="ir.ui.view">
         <field name="name">productos.cotizar.list</field>
         <field name="model">productos.cotizar</field>
         <field name="arch" type="xml">
             <list string="Productos a Cotizar" multi_edit="1">
-                <field name="name" readonly="1"/>
+                <field name="priority" widget="priority" nolabel="1"/>
                 <field name="date"/>
+                <field name="partner_id" string="Cliente"/>
+                <field name="date_start"/>
+                <field name="date_stop"/>
+                <field name="description" optional="show"/>
                 <field name="product_id"/>
+                <field name="category_id"/>
                 <field name="quantity"/>
-                <field name="supplier_id"/>
-                <field name="currency_id"/>
-                <field name="purchase_price_initial"/>
-                <field name="purchase_price_final"/>
-                <field name="sale_order_id"/>
-                <field name="partner_id"/>
-                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="currency_id" string="Divisa Compra"/>
+                <field name="purchase_price_initial" string="Valor Compra Inicial"/>
+                <field name="sale_currency_id" string="Divisa Venta"/>
+                <field name="margin"/>
+                <field name="sale_value_calc" string="Val Vtas Calc"/>
+                <field name="sale_order_id" string="Presup. Ventas"/>
+                <field name="purchase_price_final" string="Valor Compra Final"/>
+                <field name="purchase_order_id" string="Presup. Compra"/>
                 <field name="stage" widget="badge"
-                    decoration-info="stage == 'borrador'"
-                    decoration-warning="stage == 'solicitado'"
-                    decoration-success="stage in ('cotizado', 'listo')"/>
-                <field name="priority" widget="priority"/>
+                    decoration-info="stage == 'nuevo'"
+                    decoration-warning="stage == 'en_progreso'"
+                    decoration-success="stage == 'listo'"/>
             </list>
         </field>
     </record>
 
     <!-- ==================== FORM VIEW ==================== -->
+    <!-- Por qué: Layout con secciones COMPRAS / VENTAS separadas,
+         según screenshots del cliente. -->
     <record id="productos_cotizar_form_view" model="ir.ui.view">
         <field name="name">productos.cotizar.form</field>
         <field name="model">productos.cotizar</field>
         <field name="arch" type="xml">
             <form string="Solicitud de Cotización">
                 <header>
-                    <button name="action_create_purchase_orders"
-                        string="Crear Orden de Compra"
+                    <button name="action_boton_listo"
+                        string="Pasar a Listo"
                         type="object"
                         class="oe_highlight"
-                        invisible="stage != 'solicitado'"
-                        groups="purchase.group_purchase_user"/>
+                        invisible="stage != 'en_progreso'"
+                        confirm="¿Desea pasar a Listo y actualizar el precio en el presupuesto de venta?"/>
                     <field name="stage" widget="statusbar"
-                        statusbar_visible="borrador,solicitado,cotizado,listo"/>
+                        statusbar_visible="nuevo,en_progreso,listo"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
                         <h1>
-                            <field name="name" readonly="1"/>
+                            <field name="product_id" readonly="1" nolabel="1"
+                                options="{'no_open': True}"/>
                         </h1>
                     </div>
+                    <!-- Grupo superior: datos generales -->
                     <group>
-                        <group string="General">
-                            <field name="product_id"/>
-                            <field name="quantity"/>
+                        <group>
                             <field name="priority" widget="priority"/>
                             <field name="date"/>
                             <field name="date_start"/>
                             <field name="date_stop"/>
                             <field name="date_done"/>
                         </group>
-                        <group string="Proveedor">
-                            <field name="supplier_id"/>
-                            <field name="lead_time"/>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="product_id"/>
+                            <field name="category_id"/>
+                            <field name="quantity"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                     </group>
+                    <!-- Secciones COMPRAS / VENTAS -->
                     <group>
-                        <group string="Compras">
+                        <group string="COMPRAS">
                             <field name="currency_id"/>
                             <field name="exchange_rate"/>
+                            <field name="date_delivery"/>
+                            <field name="lead_time"/>
+                            <field name="purchase_order_id"/>
                             <field name="purchase_price_initial"/>
+                            <field name="category_id" string="Categoría producto" invisible="1"/>
                             <field name="margin"/>
                             <field name="purchase_price_final"/>
-                            <field name="purchase_order_id"/>
-                            <field name="purchase_line_id"/>
                         </group>
-                        <group string="Ventas">
+                        <group string="VENTAS">
                             <field name="sale_currency_id"/>
-                            <field name="sale_value_calc"/>
                             <field name="sale_order_id"/>
-                            <field name="sale_line_id"/>
+                            <field name="sale_value_calc"/>
                             <field name="partner_id"/>
                             <field name="pricelist_id"/>
                             <field name="user_id" widget="many2one_avatar_user"/>
                         </group>
+                    </group>
+                    <!-- Descripción del producto -->
+                    <group>
+                        <field name="description" readonly="1"/>
                     </group>
                 </sheet>
                 <chatter/>
@@ -99,8 +117,6 @@
     </record>
 
     <!-- ==================== KANBAN VIEW ==================== -->
-    <!-- Por qué: Kanban agrupado por stage es el flujo principal para compradores.
-         group_expand en el modelo garantiza que todas las columnas se muestren. -->
     <record id="productos_cotizar_kanban_view" model="ir.ui.view">
         <field name="name">productos.cotizar.kanban</field>
         <field name="model">productos.cotizar</field>
@@ -108,7 +124,6 @@
             <kanban default_group_by="stage" class="o_kanban_small_column">
                 <field name="name"/>
                 <field name="product_id"/>
-                <field name="supplier_id"/>
                 <field name="quantity"/>
                 <field name="purchase_price_initial"/>
                 <field name="currency_id"/>
@@ -133,9 +148,6 @@
                                 <field name="currency_id"/>
                             </span>
                         </div>
-                        <div class="text-muted small" t-if="record.supplier_id.value">
-                            Prov: <field name="supplier_id"/>
-                        </div>
                         <div class="text-muted small" t-if="record.partner_id.value">
                             Cliente: <field name="partner_id"/>
                         </div>
@@ -153,50 +165,83 @@
             <search string="Buscar Solicitudes">
                 <field name="name"/>
                 <field name="product_id"/>
-                <field name="supplier_id"/>
                 <field name="partner_id"/>
                 <field name="sale_order_id"/>
                 <field name="user_id"/>
-                <filter name="filter_borrador" string="Borrador"
-                    domain="[('stage', '=', 'borrador')]"/>
-                <filter name="filter_solicitado" string="Solicitado"
-                    domain="[('stage', '=', 'solicitado')]"/>
-                <filter name="filter_cotizado" string="Cotizado"
-                    domain="[('stage', '=', 'cotizado')]"/>
+                <filter name="filter_nuevo" string="Nuevo"
+                    domain="[('stage', '=', 'nuevo')]"/>
+                <filter name="filter_en_progreso" string="En progreso"
+                    domain="[('stage', '=', 'en_progreso')]"/>
                 <filter name="filter_listo" string="Listo"
                     domain="[('stage', '=', 'listo')]"/>
                 <separator/>
                 <filter name="filter_urgente" string="Urgentes"
                     domain="[('priority', '=', '1')]"/>
                 <separator/>
-                <!-- Odoo 19: <group> no va dentro de <search>, filtros group_by van directo -->
                 <filter name="group_stage" string="Etapa"
                     context="{'group_by': 'stage'}"/>
-                <filter name="group_supplier" string="Proveedor"
-                    context="{'group_by': 'supplier_id'}"/>
                 <filter name="group_product" string="Producto"
                     context="{'group_by': 'product_id'}"/>
                 <filter name="group_user" string="Vendedor"
                     context="{'group_by': 'user_id'}"/>
+                <filter name="group_partner" string="Cliente"
+                    context="{'group_by': 'partner_id'}"/>
             </search>
         </field>
     </record>
 
     <!-- ==================== ACTION ==================== -->
+    <!-- Por qué: view_mode list,form (no kanban default). El cliente usa lista
+         agrupada. Filtro por defecto: Nuevo. -->
     <record id="action_productos_cotizar" model="ir.actions.act_window">
         <field name="name">Productos a Cotizar</field>
         <field name="res_model">productos.cotizar</field>
-        <field name="view_mode">kanban,list,form</field>
+        <field name="view_mode">list,form,kanban</field>
         <field name="search_view_id" ref="productos_cotizar_search_view"/>
-        <field name="context">{'search_default_filter_solicitado': 1}</field>
+        <field name="context">{'search_default_filter_nuevo': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No hay solicitudes de cotización
             </p>
             <p>
-                Los vendedores crean solicitudes desde las líneas de presupuesto.
+                Los vendedores crean solicitudes desde las líneas de presupuesto
+                activando el toggle "Soli. coti."
             </p>
         </field>
+    </record>
+
+    <!-- ==================== SERVER ACTIONS ==================== -->
+    <!-- Por qué: Server actions en el menú Actions para ejecutar sobre
+         registros seleccionados en la lista. -->
+
+    <!-- Server action: Crear cotizaciones (RFQ) desde registros Nuevo -->
+    <record id="action_server_crear_cotizaciones" model="ir.actions.server">
+        <field name="name">Ceralfa -&gt; Prod a Cot -&gt; Cotizaciones</field>
+        <field name="model_id" ref="model_productos_cotizar"/>
+        <field name="binding_model_id" ref="model_productos_cotizar"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">records.action_create_purchase_orders()</field>
+    </record>
+
+    <!-- Server action: Importar precio de compra desde la PO -->
+    <record id="action_server_importar_precio" model="ir.actions.server">
+        <field name="name">Ceralfa: Importar Precio Compra</field>
+        <field name="model_id" ref="model_productos_cotizar"/>
+        <field name="binding_model_id" ref="model_productos_cotizar"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">records.action_import_purchase_price()</field>
+    </record>
+
+    <!-- Server action: Pasar a Listo y devolver precio al SO -->
+    <record id="action_server_boton_listo" model="ir.actions.server">
+        <field name="name">Ceralfa: Botón Listo</field>
+        <field name="model_id" ref="model_productos_cotizar"/>
+        <field name="binding_model_id" ref="model_productos_cotizar"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">records.action_boton_listo()</field>
     </record>
 
 </odoo>
