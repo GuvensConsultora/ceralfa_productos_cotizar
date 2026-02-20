@@ -59,10 +59,17 @@ class ProductosCotizar(models.Model):
         store=True,
         string="Categoría",
     )
+    # Por qué: No usar related con product.name porque en Odoo 19 es tipo
+    # Translated (incompatible con Char). Se usa compute en su lugar.
     description = fields.Char(
         string="Descripción",
-        related="product_id.name",
+        compute="_compute_description",
     )
+
+    @api.depends("product_id")
+    def _compute_description(self):
+        for rec in self:
+            rec.description = rec.product_id.name or ""
     quantity = fields.Float(string="Cantidad", default=1.0)
     company_id = fields.Many2one(
         "res.company",
