@@ -59,7 +59,7 @@ class ProductosCotizar(models.Model):
         store=True,
         string="Categoría",
     )
-    description = fields.Text(
+    description = fields.Char(
         string="Descripción",
         related="product_id.name",
     )
