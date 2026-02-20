@@ -1,44 +1,158 @@
 # ceralfa_productos_cotizar
 
-## Descripción
+## Bloque 1: Introducción
 
-Módulo Odoo 19 que reemplaza el modelo de Studio `x_productos_a_cotizar` con una implementación Python propia. Gestiona el flujo de solicitudes de cotización desde el área de ventas hacia compras.
+### Qué hace Odoo nativamente
 
-### Problema que resuelve
+Odoo gestiona presupuestos de venta (`sale.order`) y solicitudes de cotización a proveedores (`purchase.order`) como flujos independientes. No existe un mecanismo nativo que conecte una línea de presupuesto de venta con una solicitud de cotización de compra para que el vendedor pida precio al área de compras antes de cerrar el presupuesto.
 
-En Studio, el modelo `x_productos_a_cotizar` tenía limitaciones de rendimiento, mantenimiento y extensibilidad. Este módulo lo reemplaza con un modelo nativo que ofrece:
+### Limitación
 
-- Pipeline kanban para que compradores gestionen solicitudes
-- Botón directo en líneas de presupuesto para que vendedores soliciten cotización
-- Generación automática de RFQs (`purchase.order`) agrupadas por proveedor + moneda
-- Chatter con tracking de cambios
-- Migración automática de datos históricos de Studio
+Previamente se usaba un modelo de Studio (`x_productos_a_cotizar`) que tenía problemas de rendimiento, mantenimiento y extensibilidad. Además, el flujo requería navegar entre módulos manualmente.
 
----
+### Qué mejora este módulo
 
-## Funcionamiento nativo de Odoo utilizado
+Implementa un flujo integrado **Ventas → Compras → Ventas**:
 
-### `mail.thread` + `mail.activity.mixin`
-Odoo provee estos mixins para agregar chatter (mensajes + actividades) a cualquier modelo. Al heredarlos, el modelo obtiene automáticamente:
-- Historial de cambios (campos con `tracking=True`)
-- Mensajes internos y notas
-- Planificación de actividades
+1. El vendedor activa un toggle en la línea del presupuesto
+2. Se crea automáticamente un registro en "Productos a Cotizar"
+3. El comprador genera RFQs, obtiene precio del proveedor, aplica margen
+4. El precio calculado vuelve automáticamente al presupuesto de venta
 
-### `ir.sequence`
-Mecanismo estándar de Odoo para generar referencias únicas automáticas (ej: `SOL/2026/00001`). Se define como data XML y se consume en el `create()` del modelo.
-
-### `group_expand` en Selection
-Patrón Odoo para vistas kanban tipo pipeline. Cuando el campo de agrupación tiene `group_expand`, Odoo llama al método indicado para obtener todas las columnas posibles, incluso las que no tienen registros.
-
-### Herencia de vistas con `xpath`
-Odoo permite extender vistas existentes sin modificarlas directamente. Usamos `xpath` para inyectar el botón "Solic. Coti." dentro de la lista embebida de `order_line` en el form de `sale.order`.
-
-### `purchase.order` creation pattern
-Creación programática de órdenes de compra usando `env["purchase.order"].create()` + `env["purchase.order.line"].create()`. Odoo se encarga de los onchanges y defaults internamente.
+**Versión actual:** `19.0.2.0.0`
 
 ---
 
-## Arquitectura del módulo
+## Bloque 2: Funcionamiento para el usuario final
+
+### Flujo completo paso a paso
+
+```
+Vendedor                              Comprador
+   │                                      │
+   ├─ Presupuesto de venta                │
+   │   └─ Activa toggle "Soli. coti."     │
+   │      en la línea del producto         │
+   │                                      │
+   ├─ Se crea registro automáticamente ───┤
+   │   (estado: Nuevo)                    │
+   │                                      ├─ Ve registros en lista
+   │                                      │   (Compras → Productos a Cotizar)
+   │                                      │
+   │                                      ├─ Selecciona items en "Nuevo"
+   │                                      │   → Actions → "Ceralfa -> Prod a Cot
+   │                                      │   -> Cotizaciones"
+   │                                      │   → Se crea RFQ con empresa propia
+   │                                      │   → Estado pasa a "En progreso"
+   │                                      │
+   │                                      ├─ Edita RFQ: cambia proveedor,
+   │                                      │   envía al proveedor, recibe respuesta
+   │                                      │
+   │                                      ├─ Actions → "Ceralfa: Importar
+   │                                      │   Precio Compra"
+   │                                      │   → Lee precio de la RFQ
+   │                                      │
+   │                                      ├─ Pone margen (ej: 1.20 = +20%)
+   │                                      │
+   │                                      └─ Actions → "Ceralfa: Botón Listo"
+   │                                         → Calcula precio venta
+   │                                         → Estado pasa a "Listo"
+   │                                         → Precio vuelve al presupuesto
+   │
+   └─ Ve precio actualizado en su
+      línea de presupuesto
+```
+
+### Qué ve el vendedor
+
+En el formulario del presupuesto de venta, cada línea de producto tiene:
+
+| Campo | Descripción |
+|-------|-------------|
+| **Soli. coti.** (toggle) | Al activarlo, crea automáticamente el registro en Productos a Cotizar |
+| **Px actual.** (checkbox) | Indica que el item ya tiene precio vigente |
+
+Si el vendedor desactiva el toggle y el registro está en estado "Nuevo", se elimina automáticamente. Si ya avanzó a "En progreso" o "Listo", no se borra.
+
+### Qué ve el comprador
+
+En **Compras → Productos a Cotizar**:
+
+- **Vista lista** agrupable con todas las solicitudes (filtro por defecto: Nuevo)
+- **3 server actions** en el menú "Acciones":
+  - **Ceralfa -> Prod a Cot -> Cotizaciones**: crea RFQs desde items Nuevo
+  - **Ceralfa: Importar Precio Compra**: trae precio de la RFQ respondida
+  - **Ceralfa: Botón Listo**: calcula precio final y lo devuelve al presupuesto
+
+### Cálculo del margen
+
+El margen es un **multiplicador directo**, no un porcentaje aditivo:
+
+| Valor Compra Inicial | Margen | Valor Compra Final | Explicación |
+|---------------------|--------|-------------------|-------------|
+| 100.00 | 1.20 | 120.00 | +20% |
+| 100.00 | 1.50 | 150.00 | +50% |
+| 100.00 | 2.00 | 200.00 | +100% |
+
+Fórmula: `Valor Compra Final = Valor Compra Inicial × Margen`
+
+### Estados del registro
+
+| Estado | Significado | Cómo se llega |
+|--------|-------------|---------------|
+| **Nuevo** | Vendedor solicitó cotización | Toggle activado en SO line |
+| **En progreso** | Comprador generó RFQ | Action "Crear Cotizaciones" |
+| **Listo** | Precio devuelto al presupuesto | Action "Botón Listo" |
+
+---
+
+## Bloque 3: Parametrización
+
+### Instalación
+
+1. Colocar el módulo en la carpeta de addons
+2. Actualizar lista de módulos: **Ajustes → Actualizar lista de módulos**
+3. Buscar "Productos a Cotizar" e instalar
+
+### Acceso al módulo
+
+**Menú:** Compras → Productos a Cotizar
+
+**Grupos requeridos:**
+- Vendedores: necesitan grupo "Ventas / Usuario" para activar el toggle
+- Compradores: necesitan grupo "Compras / Usuario" para gestionar solicitudes
+- Solo "Compras / Administrador" puede eliminar registros
+
+### Uso desde Ventas (vendedor)
+
+1. Ir a **Ventas → Presupuestos**
+2. Abrir o crear un presupuesto
+3. En las líneas de producto, activar el toggle **"Soli. coti."** en los items que necesitan cotización
+4. El registro se crea automáticamente en Productos a Cotizar
+
+### Uso desde Compras (comprador)
+
+1. Ir a **Compras → Productos a Cotizar** (se abre con filtro "Nuevo")
+2. Seleccionar los items a cotizar (checkbox en lista)
+3. **Acciones → "Ceralfa -> Prod a Cot -> Cotizaciones"**
+   - Se crea una RFQ con la empresa propia como proveedor temporal
+   - El comprador edita la RFQ y cambia el proveedor
+   - Envía la RFQ al proveedor
+4. Cuando el proveedor responde con precio:
+   - Seleccionar los items en "En progreso"
+   - **Acciones → "Ceralfa: Importar Precio Compra"**
+   - El precio de la RFQ se copia al campo "Valor Compra Inicial"
+5. Completar el campo **Margen** (ej: 1.20 para +20%)
+6. **Acciones → "Ceralfa: Botón Listo"**
+   - Calcula el precio de venta (compra × margen)
+   - Actualiza el precio en la línea del presupuesto de venta
+   - Estado pasa a "Listo"
+
+---
+
+## Bloque 4: Referencia técnica
+
+### Arquitectura
 
 ```
 ceralfa_productos_cotizar/
@@ -46,11 +160,11 @@ ceralfa_productos_cotizar/
 ├── __manifest__.py
 ├── models/
 │   ├── __init__.py
-│   ├── productos_cotizar.py      ← modelo principal
-│   └── sale_order_line.py        ← botón en sale.order
+│   ├── productos_cotizar.py      ← modelo principal (productos.cotizar)
+│   └── sale_order_line.py        ← extensión sale.order.line (toggle)
 ├── views/
-│   ├── productos_cotizar_views.xml  ← list, form, kanban, search, action, secuencia
-│   ├── sale_order_line_views.xml    ← herencia vista sale.order
+│   ├── productos_cotizar_views.xml  ← list, form, kanban, search, action, server actions
+│   ├── sale_order_line_views.xml    ← herencia vista sale.order (toggles)
 │   └── menu.xml                     ← menú en Compras
 ├── security/
 │   └── ir.model.access.csv
@@ -59,58 +173,51 @@ ceralfa_productos_cotizar/
         └── post-migrate.py       ← migración datos Studio
 ```
 
----
+### Modelo `productos.cotizar`
 
-## Modelo `productos.cotizar`
+**Herencia:** `mail.thread`, `mail.activity.mixin`
+**Orden:** `priority desc, date desc, id desc`
 
-### Etapas (pipeline kanban)
-
-| Etapa | Descripción |
-|-------|-------------|
-| `borrador` | Solicitud creada manualmente, aún sin enviar |
-| `solicitado` | Vendedor solicitó cotización (desde presupuesto) |
-| `cotizado` | Comprador generó la orden de compra (RFQ) |
-| `listo` | Proceso completado |
-
-### Campos
+#### Campos
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `name` | Char | Referencia automática (secuencia `SOL/YYYY/XXXXX`) |
-| `stage` | Selection | Etapa del pipeline con `group_expand` |
+| `stage` | Selection | Etapa: nuevo, en_progreso, listo |
 | `priority` | Selection | Normal / Urgente |
-| `date` | Datetime | Fecha de solicitud |
-| `date_start` / `date_stop` | Date | Rango de fechas |
-| `date_done` | Date | Fecha de finalización |
+| `date` | Datetime | Fecha de creación |
+| `date_start` | Datetime | Periodo inicio |
+| `date_stop` | Datetime | Periodo fin |
+| `date_done` | Date | Fecha en que pasó a Listo |
 | `product_id` | Many2one → `product.product` | Producto a cotizar |
+| `category_id` | Many2one → `product.category` | Categoría del producto (related stored) |
+| `description` | Text | Nombre del producto (related) |
 | `quantity` | Float | Cantidad solicitada |
-| `supplier_id` | Many2one → `res.partner` | Proveedor (filtrado por `supplier_rank > 0`) |
-| `currency_id` | Many2one → `res.currency` | Moneda de compra |
+| `company_id` | Many2one → `res.company` | Compañía |
+| `currency_id` | Many2one → `res.currency` | Divisa de compra |
 | `exchange_rate` | Float | Tipo de cambio |
 | `lead_time` | Integer | Plazo de entrega en días |
-| `purchase_order_id` | Many2one → `purchase.order` | OC generada (readonly) |
-| `purchase_line_id` | Many2one → `purchase.order.line` | Línea de OC (readonly) |
-| `purchase_price_initial` | Float | Precio de compra inicial |
-| `margin` | Float | Margen en % |
-| `purchase_price_final` | Float (computed, stored) | `precio_inicial * (1 + margen/100)` |
-| `sale_currency_id` | Many2one → `res.currency` | Moneda de venta |
-| `sale_order_id` | Many2one → `sale.order` | Presupuesto origen (readonly) |
-| `sale_line_id` | Many2one → `sale.order.line` | Línea de presupuesto (readonly) |
-| `sale_value_calc` | Float | Valor de venta calculado |
+| `date_delivery` | Date | Fecha de entrega |
+| `purchase_order_id` | Many2one → `purchase.order` | RFQ generada (readonly) |
+| `purchase_line_id` | Many2one → `purchase.order.line` | Línea de RFQ (readonly) |
+| `purchase_price_initial` | Float | Valor Compra Inicial |
+| `margin` | Float | Margen (multiplicador directo) |
+| `purchase_price_final` | Float (computed, stored) | `purchase_price_initial × margin` |
+| `sale_currency_id` | Many2one → `res.currency` | Divisa de venta |
+| `sale_order_id` | Many2one → `sale.order` | Presupuesto de venta origen |
+| `sale_line_id` | Many2one → `sale.order.line` | Línea del presupuesto |
+| `sale_value_calc` | Float | Valor venta calculado |
 | `partner_id` | Many2one → `res.partner` | Cliente |
 | `pricelist_id` | Many2one → `product.pricelist` | Lista de precios |
 | `user_id` | Many2one → `res.users` | Vendedor |
 
----
+#### Métodos
 
-## Métodos principales
-
-### `create()` — Secuencia automática
+**`create()`** — Secuencia automática
 
 ```python
 @api.model_create_multi
 def create(self, vals_list):
-    """Asigna secuencia automática al crear registros."""
     for vals in vals_list:
         if vals.get("name", _("Nuevo")) == _("Nuevo"):
             vals["name"] = self.env["ir.sequence"].next_by_code(
@@ -119,177 +226,81 @@ def create(self, vals_list):
     return super().create(vals_list)
 ```
 
-**Patrón:** Override de `create()` con `@api.model_create_multi` (Odoo 19). Asigna la secuencia `SOL/YYYY/XXXXX` solo si el name no fue seteado manualmente.
-
-### `_compute_purchase_price_final()` — Campo computed stored
+**`_compute_purchase_price_final()`** — Multiplicador directo
 
 ```python
 @api.depends("purchase_price_initial", "margin")
 def _compute_purchase_price_final(self):
-    """Precio final = precio inicial * (1 + margen/100)"""
     for rec in self:
         if rec.purchase_price_initial and rec.margin:
-            rec.purchase_price_final = rec.purchase_price_initial * (
-                1 + rec.margin / 100
-            )
+            rec.purchase_price_final = rec.purchase_price_initial * rec.margin
         else:
             rec.purchase_price_final = rec.purchase_price_initial
 ```
 
-**Patrón:** Computed + stored. Se persiste en DB para poder filtrar y agrupar en vistas list/kanban sin recalcular en cada lectura.
+**`action_create_purchase_orders()`** — Crear RFQs
 
-### `_group_expand_stage()` — Columnas kanban
+- Filtra solo registros en estado "nuevo"
+- Agrupa por moneda (no por proveedor: el proveedor se asigna después en la RFQ)
+- Crea RFQ con `partner_id = self.env.company.partner_id` (empresa propia como vendor temporal)
+- Cambia estado a "en_progreso"
+- Retorna acción para ver las POs creadas
 
-```python
-@api.model
-def _group_expand_stage(self, stages, domain):
-    return [key for key, _ in STAGE_SELECTION]
-```
+**`action_import_purchase_price()`** — Importar precio de PO
 
-**Patrón:** `group_expand`. Odoo llama este método al agrupar por `stage` en kanban. Retorna todas las keys del selection para que se muestren columnas vacías.
+- Solo para registros en "en_progreso" con `purchase_line_id`
+- Lee `purchase_line_id.price_unit` → `purchase_price_initial`
+- Ignora si el precio es 0.0
 
-### `action_create_purchase_orders()` — Generación de RFQs
+**`action_boton_listo()`** — Devolver precio al presupuesto
 
-```python
-def action_create_purchase_orders(self):
-    """Crea purchase.order agrupadas por proveedor + moneda.
-    Cada solicitud se convierte en una línea de la PO correspondiente.
-    """
-    # Validar que todas tengan proveedor y moneda
-    for rec in self:
-        if not rec.supplier_id:
-            raise UserError(
-                _("La solicitud '%s' no tiene proveedor asignado.") % rec.name
-            )
-        if not rec.currency_id:
-            raise UserError(
-                _("La solicitud '%s' no tiene moneda de compra.") % rec.name
-            )
+- Solo para registros en "en_progreso"
+- Calcula `sale_value_calc = purchase_price_initial × margin`
+- Escribe `price_unit` en la `sale_line_id` vinculada
+- Estado → "listo", registra `date_done`
 
-    # Agrupar por (proveedor, moneda)
-    groups = {}
-    for rec in self:
-        key = (rec.supplier_id.id, rec.currency_id.id)
-        groups.setdefault(key, self.browse())
-        groups[key] |= rec
+### Extensión `sale.order.line`
 
-    created_orders = self.env["purchase.order"]
-    for (supplier_id, currency_id), recs in groups.items():
-        # Crear PO
-        po = self.env["purchase.order"].create(
-            {
-                "partner_id": supplier_id,
-                "currency_id": currency_id,
-            }
-        )
-        # Crear líneas
-        for rec in recs:
-            pol = self.env["purchase.order.line"].create(
-                {
-                    "order_id": po.id,
-                    "product_id": rec.product_id.id,
-                    "product_qty": rec.quantity,
-                    "price_unit": rec.purchase_price_initial or 0.0,
-                }
-            )
-            # Linkear solicitud → PO y línea
-            rec.write(
-                {
-                    "purchase_order_id": po.id,
-                    "purchase_line_id": pol.id,
-                    "stage": "cotizado",
-                }
-            )
-        created_orders |= po
+#### Campos agregados
 
-    # Retornar acción para ver las POs creadas
-    if len(created_orders) == 1:
-        return {
-            "type": "ir.actions.act_window",
-            "res_model": "purchase.order",
-            "res_id": created_orders.id,
-            "view_mode": "form",
-            "target": "current",
-        }
-    return {
-        "type": "ir.actions.act_window",
-        "res_model": "purchase.order",
-        "domain": [("id", "in", created_orders.ids)],
-        "view_mode": "list,form",
-        "target": "current",
-    }
-```
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `solicitar_cotizacion` | Boolean | Toggle que crea/elimina registro en productos.cotizar |
+| `precio_actual` | Boolean | Indica si el item tiene precio vigente |
 
-**Patrón:** Agrupación por tupla `(proveedor, moneda)` → 1 PO por combinación. Evita crear múltiples POs al mismo proveedor. Después de crear, linkea cada solicitud con su PO + línea y avanza el stage a "cotizado".
-
----
-
-## Extensión `sale.order.line`
-
-### `action_solicitar_cotizacion()` — Botón en líneas de presupuesto
+#### Lógica del toggle
 
 ```python
-class SaleOrderLine(models.Model):
-    _inherit = "sale.order.line"
-
-    def action_solicitar_cotizacion(self):
-        """Crea un registro en productos.cotizar desde la línea de venta."""
-        self.ensure_one()
-        order = self.order_id
-        vals = {
-            "product_id": self.product_id.id,
-            "quantity": self.product_uom_qty,
-            "stage": "solicitado",
-            # Datos de venta
-            "sale_order_id": order.id,
-            "sale_line_id": self.id,
-            "partner_id": order.partner_id.id,
-            "pricelist_id": order.pricelist_id.id,
-            "sale_currency_id": order.currency_id.id,
-            "user_id": order.user_id.id or self.env.user.id,
-            "sale_value_calc": self.price_subtotal,
-        }
-        solicitud = self.env["productos.cotizar"].create(vals)
-
-        # Retornar form de la solicitud creada
-        return {
-            "type": "ir.actions.act_window",
-            "name": _("Solicitud de Cotización"),
-            "res_model": "productos.cotizar",
-            "res_id": solicitud.id,
-            "view_mode": "form",
-            "target": "current",
-        }
+def write(self, vals):
+    res = super().write(vals)
+    if "solicitar_cotizacion" not in vals:
+        return res
+    for line in self:
+        if vals["solicitar_cotizacion"]:
+            # ON → crear solicitud si no existe
+            existente = self.env["productos.cotizar"].search(
+                [("sale_line_id", "=", line.id)], limit=1
+            )
+            if not existente and line.product_id:
+                line._crear_solicitud_cotizacion()
+        else:
+            # OFF → eliminar solo si está en "nuevo"
+            solicitud = self.env["productos.cotizar"].search(
+                [("sale_line_id", "=", line.id), ("stage", "=", "nuevo")]
+            )
+            solicitud.unlink()
+    return res
 ```
 
-**Patrón:** `_inherit` sin `_name` = herencia por extensión (no crea modelo nuevo). El método crea la solicitud pre-cargada con todos los datos disponibles de la línea y la orden, y abre el form para que el vendedor complete lo que falte (proveedor, moneda, etc.).
+### Server Actions
 
-### Vista — xpath en `sale.order` form
+| Action | Binding | Método |
+|--------|---------|--------|
+| Ceralfa -> Prod a Cot -> Cotizaciones | productos.cotizar | `action_create_purchase_orders()` |
+| Ceralfa: Importar Precio Compra | productos.cotizar | `action_import_purchase_price()` |
+| Ceralfa: Botón Listo | productos.cotizar | `action_boton_listo()` |
 
-```xml
-<record id="sale_order_form_inherit_productos_cotizar" model="ir.ui.view">
-    <field name="name">sale.order.form.inherit.productos.cotizar</field>
-    <field name="model">sale.order</field>
-    <field name="inherit_id" ref="sale.view_order_form"/>
-    <field name="arch" type="xml">
-        <xpath expr="//field[@name='order_line']//list//field[@name='price_subtotal']"
-               position="after">
-            <button name="action_solicitar_cotizacion"
-                string="Solic. Coti."
-                type="object"
-                icon="fa-shopping-cart"
-                title="Solicitar cotización al área de compras"
-                class="btn-link"/>
-        </xpath>
-    </field>
-</record>
-```
-
-**Patrón:** Herencia de vista con `xpath`. El `expr` navega dentro del campo `order_line` → su `<list>` embebida → después del campo `price_subtotal`. El botón se renderiza en cada fila de la lista de líneas.
-
----
-
-## Seguridad
+### Seguridad
 
 | Grupo | Leer | Escribir | Crear | Eliminar |
 |-------|------|----------|-------|----------|
@@ -297,167 +308,43 @@ class SaleOrderLine(models.Model):
 | Purchase Manager | ✓ | ✓ | ✓ | ✓ |
 | Sale User | ✓ | ✓ | ✓ | ✗ |
 
-```csv
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_productos_cotizar_purchase_user,productos.cotizar.purchase.user,model_productos_cotizar,purchase.group_purchase_user,1,1,1,0
-access_productos_cotizar_purchase_manager,productos.cotizar.purchase.manager,model_productos_cotizar,purchase.group_purchase_manager,1,1,1,1
-access_productos_cotizar_sale_user,productos.cotizar.sale.user,model_productos_cotizar,sales_team.group_sale_salesman,1,1,1,0
-```
+### Vistas
 
-**Por qué:** Los vendedores necesitan crear y editar solicitudes pero no eliminarlas. Solo el manager de compras puede eliminar.
+- **List**: columnas según requerimiento del cliente, `multi_edit=1`, badge con decoraciones por estado
+- **Form**: header con botón "Pasar a Listo" + statusbar, secciones COMPRAS / VENTAS, chatter
+- **Kanban**: agrupado por stage con progressbar de prioridad
+- **Search**: filtros Nuevo/En progreso/Listo/Urgentes, group by Etapa/Producto/Vendedor/Cliente
+- **Action**: vista por defecto lista, filtro `search_default_filter_nuevo`
 
----
-
-## Vistas
-
-### Kanban (vista principal)
-
-Agrupada por `stage` con `progressbar` de prioridad. Cada tarjeta muestra:
-- Prioridad (estrella) + avatar vendedor
-- Referencia + producto
-- Cantidad + precio + moneda
-- Proveedor y cliente (si existen)
-
-### List
-
-Vista con `multi_edit=1` para edición masiva. Campo `stage` con widget `badge` y decoraciones de color por etapa.
-
-### Form
-
-- **Header:** Botón "Crear Orden de Compra" (visible solo en stage `solicitado`, grupo `purchase_user`) + statusbar
-- **General:** Producto, cantidad, prioridad, fechas
-- **Proveedor:** Proveedor + plazo de entrega
-- **Compras:** Moneda, TC, precios, margen, OC generada
-- **Ventas:** Moneda venta, presupuesto, cliente, vendedor
-- **Chatter:** Mensajes + actividades
-
-### Search
-
-Filtros predefinidos por etapa + urgentes. Agrupadores por etapa, proveedor, producto y vendedor. Filtro por defecto: `solicitado`.
-
-### Menú
-
-`Compras → Productos a Cotizar` (grupo: `purchase_user`, sequence: 15)
-
----
-
-## Migración de datos (Studio → nuevo modelo)
-
-Script `migrations/19.0.1.0.0/post-migrate.py`:
-
-```python
-def migrate(cr, version):
-    """Migra registros de x_productos_a_cotizar a productos_cotizar."""
-    env = api.Environment(cr, SUPERUSER_ID, {})
-
-    # Verificar si la tabla Studio existe
-    cr.execute("""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables
-            WHERE table_name = 'x_productos_a_cotizar'
-        )
-    """)
-    if not cr.fetchone()[0]:
-        _logger.info(
-            "Tabla x_productos_a_cotizar no encontrada. "
-            "Saltando migración de datos."
-        )
-        return
-
-    # Obtener columnas reales de la tabla Studio
-    cr.execute("""
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = 'x_productos_a_cotizar'
-    """)
-    existing_columns = {row[0] for row in cr.fetchall()}
-
-    # Filtrar solo columnas que existen en la tabla
-    valid_mappings = {}
-    for studio_col, new_col in COLUMN_MAP.items():
-        if studio_col in existing_columns and new_col:
-            valid_mappings[studio_col] = new_col
-
-    # Leer registros Studio y crear en nuevo modelo
-    studio_cols = ", ".join(valid_mappings.keys())
-    cr.execute(f"SELECT id, {studio_cols} FROM x_productos_a_cotizar")
-    rows = cr.fetchall()
-    col_names = ["id"] + list(valid_mappings.keys())
-
-    migrated = 0
-    for row in rows:
-        record = dict(zip(col_names, row))
-        vals = {}
-        for studio_col, new_col in valid_mappings.items():
-            value = record.get(studio_col)
-            if value is not None:
-                vals[new_col] = value
-        if vals:
-            try:
-                env["productos.cotizar"].create(vals)
-                migrated += 1
-            except Exception as e:
-                _logger.warning("Error migrando registro Studio id=%s: %s", record["id"], e)
-
-    _logger.info("Migración completada: %d/%d registros migrados", migrated, len(rows))
-```
-
-**Estrategia:**
-1. Verifica si la tabla Studio existe (no falla si no está)
-2. Descubre dinámicamente las columnas reales de la tabla (los nombres `x_studio_*` pueden variar)
-3. Mapea solo las columnas que encuentra
-4. Crea registros uno a uno con manejo de errores individual
-5. Loguea resultado de la migración
-
-**IMPORTANTE:** Verificar los nombres reales de columnas `x_studio_*` en la DB de staging antes del deploy. El `COLUMN_MAP` en el script tiene nombres estimados que deben ajustarse.
-
----
-
-## Flujo de uso
-
-```
-Vendedor                          Comprador
-   │                                  │
-   ├─ Presupuesto de venta            │
-   │   └─ Click "Solic. Coti."       │
-   │       en línea de producto       │
-   │                                  │
-   ├─ Se crea solicitud ──────────────┤
-   │   (stage: solicitado)            │
-   │                                  ├─ Ve solicitud en kanban
-   │                                  │   (Compras → Productos a Cotizar)
-   │                                  │
-   │                                  ├─ Completa: proveedor, moneda,
-   │                                  │   precio, margen, plazo
-   │                                  │
-   │                                  ├─ Click "Crear Orden de Compra"
-   │                                  │   → Genera purchase.order
-   │                                  │   → stage pasa a "cotizado"
-   │                                  │
-   │                                  ├─ Gestiona RFQ en módulo Compras
-   │                                  │   (confirma, recibe, etc.)
-   │                                  │
-   │                                  └─ Marca como "listo"
-   │
-   └─ Ve la OC linkeada en la solicitud
-```
-
----
-
-## Dependencias
+### Dependencias
 
 | Módulo | Motivo |
 |--------|--------|
-| `sale` | Herencia de `sale.order.line` + vistas |
-| `purchase` | Creación de `purchase.order` + grupos de seguridad |
+| `sale` | Herencia `sale.order.line` + vistas |
+| `purchase` | Creación de `purchase.order` + grupos seguridad |
 | `mail` | Chatter (`mail.thread` + `mail.activity.mixin`) |
 
----
+### Compatibilidad Odoo 19
 
-## Compatibilidad Odoo 19
-
-- `<list>` en lugar de `<tree>` (breaking change Odoo 19)
-- Sin `<group>` dentro de `<search>` (RNG validation)
+- `<list>` en lugar de `<tree>`
+- Sin `<group>` dentro de `<search>`
 - `invisible` con expresión Python (no `attrs`)
-- `@api.model_create_multi` (reemplaza `@api.model` para create)
+- `@api.model_create_multi` para `create()`
 - `license` declarado en manifest
+
+### Migración de datos (Studio → modelo nativo)
+
+Script `migrations/19.0.1.0.0/post-migrate.py`:
+1. Verifica si la tabla Studio `x_productos_a_cotizar` existe
+2. Descubre dinámicamente las columnas reales `x_studio_*`
+3. Mapea columnas encontradas al nuevo modelo
+4. Crea registros uno a uno con manejo de errores individual
+
+### Verificación
+
+1. **Toggle SO:** Crear presupuesto → agregar línea → activar toggle → verificar registro en Compras > Productos a cotizar (Nuevo)
+2. **Desactivar toggle:** Desactivar → verificar que se elimina (solo si Nuevo)
+3. **Crear RFQ:** Seleccionar items Nuevo → Actions → Crear cotizaciones → verificar RFQ creada, estado En progreso
+4. **Importar precio:** Poner precio en RFQ → Actions → Importar Precio → verificar Valor Compra Inicial
+5. **Margen:** Poner margen 1.20 → verificar Valor Compra Final = Inicial × 1.20
+6. **Botón Listo:** Actions → Botón Listo → verificar estado Listo y precio actualizado en sale.order.line
