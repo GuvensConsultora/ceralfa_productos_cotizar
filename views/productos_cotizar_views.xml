@@ -17,6 +17,12 @@
         <field name="model">productos.cotizar</field>
         <field name="arch" type="xml">
             <list string="Productos a Cotizar" multi_edit="1">
+                <!-- Por qué: <header> en list view muestra botones al seleccionar registros.
+                     Reemplaza el menú Actions que confundía con la acción Studio vieja. -->
+                <header>
+                    <button name="action_create_purchase_orders" type="object"
+                            string="Cotizar" class="btn-primary"/>
+                </header>
                 <field name="priority" widget="priority" nolabel="1"/>
                 <field name="date"/>
                 <field name="partner_id" string="Cliente"/>
@@ -215,10 +221,12 @@
          registros seleccionados en la lista. -->
 
     <!-- Server action: Crear cotizaciones (RFQ) desde registros Nuevo -->
+    <!-- Por qué: sin binding_model_id para que NO aparezca en menú Actions.
+         Se invoca desde el botón "Cotizar" en el <header> de la list view. -->
     <record id="action_server_crear_cotizaciones" model="ir.actions.server">
         <field name="name">Ceralfa -&gt; Prod a Cot -&gt; Cotizaciones</field>
         <field name="model_id" ref="model_productos_cotizar"/>
-        <field name="binding_model_id" ref="model_productos_cotizar"/>
+        <field name="binding_model_id" eval="False"/>
         <field name="binding_type">action</field>
         <field name="state">code</field>
         <field name="code">records.action_create_purchase_orders()</field>
@@ -228,7 +236,7 @@
     <record id="action_server_importar_precio" model="ir.actions.server">
         <field name="name">Ceralfa: Importar Precio Compra</field>
         <field name="model_id" ref="model_productos_cotizar"/>
-        <field name="binding_model_id" ref="model_productos_cotizar"/>
+        <field name="binding_model_id" eval="False"/>
         <field name="binding_type">action</field>
         <field name="state">code</field>
         <field name="code">records.action_import_purchase_price()</field>
@@ -238,7 +246,7 @@
     <record id="action_server_boton_listo" model="ir.actions.server">
         <field name="name">Ceralfa: Botón Listo</field>
         <field name="model_id" ref="model_productos_cotizar"/>
-        <field name="binding_model_id" ref="model_productos_cotizar"/>
+        <field name="binding_model_id" eval="False"/>
         <field name="binding_type">action</field>
         <field name="state">code</field>
         <field name="code">records.action_boton_listo()</field>

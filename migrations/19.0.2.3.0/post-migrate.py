@@ -12,10 +12,10 @@ def migrate(cr, version):
 
     Patrón: SQL directo porque el ORM no está disponible en migraciones.
     """
-    # Desactivar acciones cuyo código Python referencia campos removidos
-    # en Odoo 19 (uom_po_id) o campos Studio del modelo viejo (x_studio_*)
+    # Por qué: ir_act_server es el _table real de ir.actions.server en Odoo
+    # (NO ir_actions_server — ese nombre no existe y las migraciones previas fallaban silenciosamente)
     cr.execute("""
-        UPDATE ir_actions_server
+        UPDATE ir_act_server
         SET active = false
         WHERE state = 'code'
           AND active = true
