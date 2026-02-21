@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Por qué: Agrega campo margen por defecto en el form de categoría
+         para que el responsable de compras configure el multiplicador
+         que se autocompleta al importar precio. -->
+    <record id="product_category_form_inherit_margin" model="ir.ui.view">
+        <field name="name">product.category.form.inherit.margin</field>
+        <field name="model">product.category</field>
+        <field name="inherit_id" ref="product.product_category_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='parent_id']" position="after">
+                <field name="margin_default"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

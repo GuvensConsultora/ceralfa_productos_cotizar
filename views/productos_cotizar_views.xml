@@ -244,4 +244,30 @@
         <field name="code">records.action_boton_listo()</field>
     </record>
 
+    <!-- ==================== PURCHASE ORDER FORM: SMART BUTTON + BOTÓN HEADER ==================== -->
+    <!-- Por qué: Desde la PO el comprador puede ver las solicitudes vinculadas
+         y enviar precios de vuelta a productos.cotizar con un solo click. -->
+    <record id="purchase_order_form_inherit_cotizar" model="ir.ui.view">
+        <field name="name">purchase.order.form.inherit.cotizar</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <!-- Smart button: muestra count de solicitudes vinculadas -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_productos_cotizar" type="object"
+                        class="oe_stat_button" icon="fa-list"
+                        invisible="cotizar_count == 0">
+                    <field name="cotizar_count" string="Prod. a Cotizar" widget="statinfo"/>
+                </button>
+            </xpath>
+            <!-- Botón header: importa precios a las solicitudes vinculadas -->
+            <xpath expr="//header" position="inside">
+                <button name="action_send_to_productos_cotizar" type="object"
+                        string="Enviar a Prod. a Cotizar"
+                        class="btn-secondary"
+                        invisible="cotizar_count == 0"/>
+            </xpath>
+        </field>
+    </record>
+
 </odoo>

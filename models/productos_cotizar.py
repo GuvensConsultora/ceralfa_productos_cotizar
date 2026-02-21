@@ -273,6 +273,9 @@ class ProductosCotizar(models.Model):
             price = rec.purchase_line_id.price_unit
             if price > 0.0:
                 rec.purchase_price_initial = price
+                # Autocompletar margen desde categoría si no tiene uno asignado
+                if not rec.margin and rec.category_id.margin_default:
+                    rec.margin = rec.category_id.margin_default
 
     # --- Acción: Botón Listo ---
     def action_boton_listo(self):

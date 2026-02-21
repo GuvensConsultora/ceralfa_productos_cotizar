@@ -13,12 +13,14 @@
     "depends": [
         "sale",
         "purchase",
+        "product",
         "mail",
     ],
     "data": [
         "security/ir.model.access.csv",
         "views/productos_cotizar_views.xml",
         "views/sale_order_line_views.xml",
+        "views/product_category_views.xml",
         "views/menu.xml",
     ],
     "installable": True,
