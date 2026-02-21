@@ -9,7 +9,8 @@
         <field name="model">x_productos_a_cotizar</field>
         <field name="inherit_id" ref="studio_customization.default_list_view_fo_dc9aa256-be2c-4381-a4b9-632e0174ba40"/>
         <field name="arch" type="xml">
-            <xpath expr="//list" position="inside">
+            <!-- Por qué: Studio creó la vista en Odoo 17 con <tree>, no <list> -->
+            <xpath expr="//tree" position="inside">
                 <header>
                     <button name="action_cotizar" type="object"
                             string="Cotizar" class="btn-primary"/>
