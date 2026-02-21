@@ -1,6 +1,6 @@
 {
     "name": "Productos a Cotizar",
-    "version": "19.0.2.2.0",
+    "version": "19.0.2.3.0",
     "category": "Purchases",
     "summary": "Solicitudes de cotización desde ventas hacia compras",
     "description": """
