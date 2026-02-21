@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Herencia sobre la list view de Studio para agregar botón "Cotizar".
+         Por qué: el usuario selecciona registros y el botón aparece en el header.
+         Reemplaza el menú Actions que tenía la acción Studio rota (uom_po_id). -->
+    <record id="x_productos_cotizar_list_inherit" model="ir.ui.view">
+        <field name="name">x_productos_a_cotizar.list.inherit.cotizar</field>
+        <field name="model">x_productos_a_cotizar</field>
+        <field name="inherit_id" ref="studio_customization.default_list_view_fo_dc9aa256-be2c-4381-a4b9-632e0174ba40"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <header>
+                    <button name="action_cotizar" type="object"
+                            string="Cotizar" class="btn-primary"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

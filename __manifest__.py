@@ -1,6 +1,6 @@
 {
     "name": "Productos a Cotizar",
-    "version": "19.0.2.4.0",
+    "version": "19.0.2.5.0",
     "category": "Purchases",
     "summary": "Solicitudes de cotización desde ventas hacia compras",
     "description": """
@@ -15,10 +15,12 @@
         "purchase",
         "product",
         "mail",
+        "studio_customization",
     ],
     "data": [
         "security/ir.model.access.csv",
         "views/productos_cotizar_views.xml",
+        "views/x_productos_cotizar_views.xml",
         "views/sale_order_line_views.xml",
         "views/product_category_views.xml",
         "views/menu.xml",
