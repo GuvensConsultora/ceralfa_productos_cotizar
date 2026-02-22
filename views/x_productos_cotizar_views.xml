@@ -10,7 +10,7 @@
         <field name="model_id" search="[('model','=','x_productos_a_cotizar')]"/>
         <field name="state">code</field>
         <field name="code">
-# Agrupar registros seleccionados por (moneda, compañía)
+# Agrupar registros seleccionados por (moneda, partner)
 groups = {}
 for rec in records:
     key = (
@@ -21,31 +21,37 @@ for rec in records:
     groups[key] |= rec
 
 created_ids = []
-for (currency_id, company_id), recs in groups.items():
+for (currency_id, partner_id), recs in groups.items():
     # Fecha de entrega: la más temprana del grupo
     primer_entrega = min(recs, key=lambda r: r.x_studio_date_stop or r.create_date)
-    po = env['purchase.order'].create({
-        'partner_id': company_id,
-        'currency_id': currency_id,
-        'company_id': company_id,
-        'date_order': primer_entrega.x_studio_date_stop,
-    })
+
+    # Armar líneas con (0, 0, vals) para crear PO + líneas en un solo create
+    # Por qué: crear líneas por separado dispara trigger account.move.purchase_id
+    # que falla porque ese campo no es stored en Odoo 19
+    order_lines = []
+    line_rec_map = []
     for rec in recs:
         product = env['product.template'].browse(rec.x_studio_producto.id)
-        env['purchase.order.line'].create({
-            'order_id': po.id,
+        line_vals = {
             'product_id': product.product_variant_id.id,
             'product_qty': rec.x_studio_cantidad,
             'price_unit': product.standard_price,
-            # Odoo 19 asigna UoM automáticamente desde el producto
             'name': rec.x_name,
-            'date_planned': primer_entrega.x_studio_date_stop,
-        })
+        }
+        order_lines.append((0, 0, line_vals))
+        line_rec_map.append(rec)
+
+    po = env['purchase.order'].create({
+        'partner_id': partner_id,
+        'currency_id': currency_id,
+        'date_order': primer_entrega.x_studio_date_stop,
+    })
+    po.write({'order_line': order_lines})
+
     # Vincular cada registro con su línea de PO
-    for po_line in po.order_line:
-        matching = recs.filtered(lambda r: r.x_name == po_line.name)
-        if matching:
-            matching[0].write({
+    for idx, po_line in enumerate(po.order_line):
+        if idx &lt; len(line_rec_map):
+            line_rec_map[idx].write({
                 'x_studio_ppto_comp': po.id,
                 'x_studio_linea_ppto_cpras': po_line.id,
                 'x_studio_stage_id': 2,
