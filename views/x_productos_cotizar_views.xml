@@ -41,12 +41,14 @@ for (currency_id, partner_id), recs in groups.items():
         order_lines.append((0, 0, line_vals))
         line_rec_map.append(rec)
 
+    # Por qué: order_line DEBE ir en el create, no en write separado.
+    # write() dispara modified() → busca account.move.purchase_id (no stored en Odoo 19)
     po = env['purchase.order'].create({
         'partner_id': partner_id,
         'currency_id': currency_id,
         'date_order': primer_entrega.x_studio_date_stop,
+        'order_line': order_lines,
     })
-    po.write({'order_line': order_lines})
 
     # Vincular cada registro con su línea de PO
     for idx, po_line in enumerate(po.order_line):
