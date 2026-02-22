@@ -37,8 +37,7 @@ for (currency_id, company_id), recs in groups.items():
             'product_id': product.product_variant_id.id,
             'product_qty': rec.x_studio_cantidad,
             'price_unit': product.standard_price,
-            # Por qué: uom_po_id fue removido en Odoo 19, se usa uom_id
-            'product_uom': product.uom_id.id,
+            # Odoo 19 asigna UoM automáticamente desde el producto
             'name': rec.x_name,
             'date_planned': primer_entrega.x_studio_date_stop,
         })
@@ -85,7 +84,7 @@ else:
             <list string="Productos a Cotizar" multi_edit="1">
                 <header>
                     <button name="%(action_cotizar_server)d" type="action"
-                            string="Cotizar" class="btn-primary"/>
+                            string="Coti Compra" class="btn-primary"/>
                 </header>
                 <field name="x_studio_date" string="Fecha"/>
                 <field name="x_studio_cliente" string="Cliente"/>
