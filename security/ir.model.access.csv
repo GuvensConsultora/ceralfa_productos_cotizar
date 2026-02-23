@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_productos_cotizar_purchase_user,productos.cotizar.purchase.user,model_productos_cotizar,purchase.group_purchase_user,1,1,1,0
-access_productos_cotizar_purchase_manager,productos.cotizar.purchase.manager,model_productos_cotizar,purchase.group_purchase_manager,1,1,1,1
-access_productos_cotizar_sale_user,productos.cotizar.sale.user,model_productos_cotizar,sales_team.group_sale_salesman,1,1,1,0
+access_x_productos_cotizar_admin,x_productos_a_cotizar admin,model_x_productos_a_cotizar,base.group_system,1,1,1,1
+access_x_productos_cotizar_user,x_productos_a_cotizar user,model_x_productos_a_cotizar,base.group_user,1,1,1,0
+access_x_productos_cotizar_stage_admin,x_productos_a_cotizar_stage admin,model_x_productos_a_cotizar_stage,base.group_system,1,1,1,1
+access_x_productos_cotizar_stage_user,x_productos_a_cotizar_stage user,model_x_productos_a_cotizar_stage,base.group_user,1,1,1,0

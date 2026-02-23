@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- =================================================================
+         Vista LIST — columnas principales para gestión rápida
+         ================================================================= -->
+    <record id="x_productos_a_cotizar_view_list" model="ir.ui.view">
+        <field name="name">x_productos_a_cotizar.list</field>
+        <field name="model">x_productos_a_cotizar</field>
+        <field name="arch" type="xml">
+            <list string="Productos a Cotizar"
+                  decoration-danger="x_studio_kanban_state == 'cancel'"
+                  decoration-success="x_studio_kanban_state == 'sale'"
+                  decoration-info="x_studio_kanban_state == 'sent'">
+                <field name="x_studio_sequence" widget="handle"/>
+                <field name="x_studio_date"/>
+                <field name="x_name"/>
+                <field name="x_studio_producto"/>
+                <field name="x_studio_categoria_del_producto"/>
+                <field name="x_studio_cliente"/>
+                <field name="x_studio_vendedor"/>
+                <field name="x_studio_cantidad"/>
+                <field name="x_studio_currency_id" optional="hide"/>
+                <field name="x_studio_valor_cpra" optional="show"/>
+                <field name="x_studio_val_vtas_calc" optional="show"/>
+                <field name="x_studio_margen" optional="show"/>
+                <field name="x_studio_presupuesto_de_vtas" optional="show"/>
+                <field name="x_studio_ppto_comp" optional="show"/>
+                <field name="x_studio_stage_id"/>
+                <field name="x_studio_kanban_state" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- =================================================================
+         Vista FORM — todas las secciones del modelo
+         ================================================================= -->
+    <record id="x_productos_a_cotizar_view_form" model="ir.ui.view">
+        <field name="name">x_productos_a_cotizar.form</field>
+        <field name="model">x_productos_a_cotizar</field>
+        <field name="arch" type="xml">
+            <form string="Producto a Cotizar">
+                <header>
+                    <field name="x_studio_stage_id" widget="statusbar"
+                           clickable="1"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box"/>
+                    <widget name="web_ribbon" title="Archivado"
+                            bg_color="text-bg-danger"
+                            invisible="x_active"/>
+                    <div class="oe_title">
+                        <label for="x_name"/>
+                        <h1><field name="x_name" placeholder="Descripción del producto a cotizar"/></h1>
+                    </div>
+                    <group>
+                        <group string="Producto">
+                            <field name="x_studio_producto"/>
+                            <field name="x_studio_categoria"/>
+                            <field name="x_studio_categoria_del_producto"/>
+                            <field name="x_studio_cantidad"/>
+                            <field name="x_studio_margen" widget="percentage"/>
+                        </group>
+                        <group string="Comercial">
+                            <field name="x_studio_cliente"/>
+                            <field name="x_studio_vendedor"/>
+                            <field name="x_studio_compaia" groups="base.group_multi_company"/>
+                            <field name="x_studio_lista_de_precios"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Presupuestos">
+                            <field name="x_studio_presupuesto_de_vtas"/>
+                            <field name="x_studio_linea_ppto_vtas"/>
+                            <field name="x_studio_ppto_comp"/>
+                            <field name="x_studio_linea_ppto_cpras"/>
+                        </group>
+                        <group string="Montos">
+                            <field name="x_studio_currency_id"/>
+                            <field name="x_studio_divisa_en_compras"/>
+                            <field name="x_studio_tipo_de_cambio"/>
+                            <field name="x_studio_valor_cpra"/>
+                            <field name="x_studio_val_cpra_final"/>
+                            <field name="x_studio_val_vtas_calc"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Fechas">
+                            <field name="x_studio_date"/>
+                            <field name="x_studio_date_start"/>
+                            <field name="x_studio_date_stop"/>
+                            <field name="x_studio_fecha_en_listo"/>
+                        </group>
+                        <group string="Entrega">
+                            <field name="x_studio_plazo_de_entrega"/>
+                            <field name="x_studio_plazo_de_entrega_1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Estado">
+                            <field name="x_studio_kanban_state"/>
+                            <field name="x_studio_selection_field_6bo_1i73jg105"
+                                   string="Selección"/>
+                            <field name="x_studio_priority" widget="boolean_toggle"/>
+                            <field name="x_active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notas" name="notes">
+                            <field name="x_studio_notes"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- =================================================================
+         Vista KANBAN — tarjetas agrupadas por etapa
+         ================================================================= -->
+    <record id="x_productos_a_cotizar_view_kanban" model="ir.ui.view">
+        <field name="name">x_productos_a_cotizar.kanban</field>
+        <field name="model">x_productos_a_cotizar</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="x_studio_stage_id"
+                    class="o_kanban_small_column"
+                    records_draggable="1">
+                <field name="x_name"/>
+                <field name="x_studio_producto"/>
+                <field name="x_studio_cliente"/>
+                <field name="x_studio_vendedor"/>
+                <field name="x_studio_kanban_state"/>
+                <field name="x_studio_priority"/>
+                <field name="x_color"/>
+                <field name="x_studio_val_vtas_calc"/>
+                <field name="x_studio_currency_id"/>
+                <templates>
+                    <t t-name="card">
+                        <field name="x_studio_priority" widget="boolean_toggle"
+                               class="float-end"/>
+                        <strong>
+                            <field name="x_name"/>
+                        </strong>
+                        <field name="x_studio_producto"
+                               invisible="not x_studio_producto"/>
+                        <field name="x_studio_cliente"
+                               invisible="not x_studio_cliente"/>
+                        <div class="d-flex justify-content-between"
+                             t-if="record.x_studio_val_vtas_calc.raw_value">
+                            <field name="x_studio_val_vtas_calc"
+                                   widget="monetary"/>
+                        </div>
+                        <footer>
+                            <field name="x_studio_vendedor"
+                                   widget="many2one_avatar_user"/>
+                            <field name="x_studio_kanban_state"
+                                   widget="label_selection"
+                                   class="float-end"/>
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- =================================================================
+         Vista CALENDAR — usa date_start / date_stop del modelo
+         ================================================================= -->
+    <record id="x_productos_a_cotizar_view_calendar" model="ir.ui.view">
+        <field name="name">x_productos_a_cotizar.calendar</field>
+        <field name="model">x_productos_a_cotizar</field>
+        <field name="arch" type="xml">
+            <calendar string="Productos a Cotizar"
+                      date_start="x_studio_date_start"
+                      date_stop="x_studio_date_stop"
+                      color="x_studio_stage_id"
+                      mode="month">
+                <field name="x_name"/>
+                <field name="x_studio_producto"/>
+                <field name="x_studio_cliente"/>
+                <field name="x_studio_vendedor"/>
+            </calendar>
+        </field>
+    </record>
+
+    <!-- =================================================================
+         Vista SEARCH — filtros y agrupaciones útiles
+         ================================================================= -->
+    <record id="x_productos_a_cotizar_view_search" model="ir.ui.view">
+        <field name="name">x_productos_a_cotizar.search</field>
+        <field name="model">x_productos_a_cotizar</field>
+        <field name="arch" type="xml">
+            <search string="Productos a Cotizar">
+                <field name="x_name"/>
+                <field name="x_studio_producto"/>
+                <field name="x_studio_cliente"/>
+                <field name="x_studio_vendedor"/>
+                <field name="x_studio_presupuesto_de_vtas"/>
+                <field name="x_studio_ppto_comp"/>
+                <separator/>
+                <filter name="active" string="Activos"
+                        domain="[('x_active', '=', True)]"/>
+                <filter name="archived" string="Archivados"
+                        domain="[('x_active', '=', False)]"/>
+                <separator/>
+                <filter name="priority" string="Alta prioridad"
+                        domain="[('x_studio_priority', '=', True)]"/>
+                <separator/>
+                <filter name="draft" string="Cotización"
+                        domain="[('x_studio_kanban_state', '=', 'draft')]"/>
+                <filter name="sent" string="Enviada"
+                        domain="[('x_studio_kanban_state', '=', 'sent')]"/>
+                <filter name="sale" string="Orden de venta"
+                        domain="[('x_studio_kanban_state', '=', 'sale')]"/>
+                <filter name="cancel" string="Cancelado"
+                        domain="[('x_studio_kanban_state', '=', 'cancel')]"/>
+                <separator/>
+                <filter name="group_stage" string="Etapa"
+                        context="{'group_by': 'x_studio_stage_id'}"/>
+                <filter name="group_cliente" string="Cliente"
+                        context="{'group_by': 'x_studio_cliente'}"/>
+                <filter name="group_vendedor" string="Vendedor"
+                        context="{'group_by': 'x_studio_vendedor'}"/>
+                <filter name="group_producto" string="Producto"
+                        context="{'group_by': 'x_studio_producto'}"/>
+                <filter name="group_categoria" string="Categoría"
+                        context="{'group_by': 'x_studio_categoria_del_producto'}"/>
+                <filter name="group_date" string="Fecha"
+                        context="{'group_by': 'x_studio_date:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- =================================================================
+         ACTION + MENÚ
+         ================================================================= -->
+    <record id="x_productos_a_cotizar_action" model="ir.actions.act_window">
+        <field name="name">Productos a Cotizar</field>
+        <field name="res_model">x_productos_a_cotizar</field>
+        <field name="view_mode">list,kanban,form,calendar</field>
+        <field name="search_view_id" ref="x_productos_a_cotizar_view_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Crear un producto a cotizar
+            </p>
+        </field>
+    </record>
+
+    <!-- Menú bajo Ventas → Productos a Cotizar -->
+    <menuitem id="x_productos_a_cotizar_menu"
+              name="Productos a Cotizar"
+              action="x_productos_a_cotizar_action"
+              parent="sale.sale_order_menu"
+              sequence="30"/>
+
+</odoo>

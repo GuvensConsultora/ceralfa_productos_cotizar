@@ -1,30 +1,14 @@
 {
-    "name": "Productos a Cotizar",
-    "version": "19.0.2.9.0",
-    "category": "Purchases",
-    "summary": "Solicitudes de cotización desde ventas hacia compras",
-    "description": """
-        Reemplazo del modelo Studio x_productos_a_cotizar.
-        Permite a vendedores solicitar cotizaciones al área de compras
-        desde las líneas del presupuesto de ventas.
-    """,
-    "author": "Guvens Consultora",
-    "license": "LGPL-3",
-    "depends": [
-        "sale",
-        "purchase",
-        "account",
-        "product",
-        "mail",
+    'name': 'Productos a Cotizar',
+    'version': '19.0.1.0.0',
+    'category': 'Sales',
+    'summary': 'Gestión de productos a cotizar con vinculación compra/venta',
+    'author': 'Guvens Consultora',
+    'license': 'LGPL-3',
+    'depends': ['mail', 'product', 'sale', 'purchase'],
+    'data': [
+        'security/ir.model.access.csv',
+        'views/x_productos_a_cotizar_views.xml',
     ],
-    "data": [
-        "security/ir.model.access.csv",
-        "views/productos_cotizar_views.xml",
-        "views/x_productos_cotizar_views.xml",
-        "views/sale_order_line_views.xml",
-        "views/product_category_views.xml",
-        "views/menu.xml",
-    ],
-    "installable": True,
-    "application": False,
+    'installable': True,
 }
