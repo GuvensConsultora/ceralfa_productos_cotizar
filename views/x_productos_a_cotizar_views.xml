@@ -255,11 +255,5 @@
               parent="sale.sale_order_menu"
               sequence="30"/>
 
-    <!-- Menú bajo Compras → Productos a Cotizar (mismo action, acceso dual) -->
-    <menuitem id="x_productos_a_cotizar_purchase_menu"
-              name="Productos a Cotizar"
-              action="x_productos_a_cotizar_action"
-              parent="purchase.menu_procurement_management"
-              sequence="30"/>
 
 </odoo>
