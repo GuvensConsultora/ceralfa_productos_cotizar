@@ -2,6 +2,7 @@
 # Se usa para cotización de productos vinculada a compras/ventas.
 # Patrón: mismos nombres de campo → Odoo reutiliza las columnas → datos preservados.
 from odoo import fields, models
+from odoo.exceptions import UserError
 
 
 class ProductosACotizarStage(models.Model):
@@ -85,3 +86,92 @@ class ProductosACotizar(models.Model):
     # --- Entrega ---
     x_studio_plazo_de_entrega = fields.Datetime('Fecha de entrega')
     x_studio_plazo_de_entrega_1 = fields.Integer('Plazo de entrega')
+
+    # =================================================================
+    # Acciones (reemplazan automatizaciones Studio v17)
+    # =================================================================
+
+    def action_marcar_listo(self):
+        """Marca los registros seleccionados como 'Listo'.
+        Setea fecha_en_listo = hoy y mueve a la última etapa por secuencia.
+        """
+        # Por qué: search con order desc + limit 1 = última etapa configurada
+        last_stage = self.env['x_productos_a_cotizar_stage'].search(
+            [], order='x_studio_sequence desc, id desc', limit=1,
+        )
+        vals = {'x_studio_fecha_en_listo': fields.Date.today()}
+        if last_stage:
+            vals['x_studio_stage_id'] = last_stage.id
+        self.write(vals)
+
+    def action_cotizaciones(self):
+        """Abre presupuestos vinculados o crea nuevos para los seleccionados.
+        - Líneas CON presupuesto → se abren los existentes.
+        - Líneas SIN presupuesto → se crea uno por cliente, con las líneas
+          como productos del SO.
+        """
+        with_order = self.filtered('x_studio_presupuesto_de_vtas')
+        without_order = self - with_order
+
+        # Por qué: mapped() devuelve recordset de sale.order sin duplicados
+        orders = with_order.mapped('x_studio_presupuesto_de_vtas')
+
+        if without_order:
+            # Por qué: agrupar por cliente → un SO por partner
+            by_client = {}
+            for rec in without_order:
+                if not rec.x_studio_cliente:
+                    continue
+                by_client.setdefault(rec.x_studio_cliente.id, [])
+                by_client[rec.x_studio_cliente.id].append(rec)
+
+            if not by_client and not orders:
+                raise UserError("Las líneas seleccionadas no tienen cliente asignado.")
+
+            SaleOrder = self.env['sale.order']
+            SaleOrderLine = self.env['sale.order.line']
+
+            for partner_id, recs in by_client.items():
+                order_vals = {'partner_id': partner_id}
+                # Por qué: pricelist del primer registro que tenga
+                pricelist = next(
+                    (r.x_studio_lista_de_precios for r in recs
+                     if r.x_studio_lista_de_precios), False,
+                )
+                if pricelist:
+                    order_vals['pricelist_id'] = pricelist.id
+
+                order = SaleOrder.create(order_vals)
+
+                for rec in recs:
+                    if rec.x_studio_producto:
+                        # Por qué: product_variant_id → variante principal del template
+                        product = rec.x_studio_producto.product_variant_id
+                        SaleOrderLine.create({
+                            'order_id': order.id,
+                            'product_id': product.id,
+                            'product_uom_qty': rec.x_studio_cantidad or 1.0,
+                        })
+                    # Vincular el presupuesto creado al registro
+                    rec.x_studio_presupuesto_de_vtas = order.id
+
+                orders |= order
+
+        if not orders:
+            raise UserError("No hay presupuestos vinculados ni líneas para crear.")
+
+        # Por qué: si es uno solo → abrir form directo; si son varios → lista
+        if len(orders) == 1:
+            return {
+                'type': 'ir.actions.act_window',
+                'res_model': 'sale.order',
+                'view_mode': 'form',
+                'res_id': orders.id,
+            }
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'sale.order',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', orders.ids)],
+            'name': 'Cotizaciones',
+        }

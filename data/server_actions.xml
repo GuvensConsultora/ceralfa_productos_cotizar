@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Por qué: binding_model_id + binding_view_types='list' → aparece en
+         el dropdown "Acción" al seleccionar registros en la vista lista.
+         Reemplaza las automatizaciones de Studio v17. -->
+
+    <record id="action_server_marcar_listo" model="ir.actions.server">
+        <field name="name">Marcar como Listo</field>
+        <field name="model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_marcar_listo()</field>
+    </record>
+
+    <record id="action_server_cotizaciones" model="ir.actions.server">
+        <field name="name">Cotizaciones</field>
+        <field name="model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_cotizaciones()</field>
+    </record>
+
+</odoo>
