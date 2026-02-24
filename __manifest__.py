@@ -9,6 +9,7 @@
     'data': [
         'security/ir.model.access.csv',
         'views/x_productos_a_cotizar_views.xml',
+        'views/sale_order_line_views.xml',
         'data/server_actions.xml',
     ],
     'installable': True,

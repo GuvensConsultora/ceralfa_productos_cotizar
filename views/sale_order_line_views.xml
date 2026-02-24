@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Por qué: agrega columna toggle "Pedir Cotización" en la lista de líneas
+         del presupuesto de venta, después de la cantidad.
+         Patrón: herencia de vista con XPath sobre sale.view_order_form -->
+    <record id="view_order_form_inherit_cotizar" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.cotizar</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']//field[@name='product_uom_qty']" position="after">
+                <field name="x_pedir_cotizacion" widget="boolean_toggle"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
