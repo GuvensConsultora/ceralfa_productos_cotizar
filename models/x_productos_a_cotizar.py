@@ -9,6 +9,9 @@ class ProductosACotizarStage(models.Model):
     _name = 'x_productos_a_cotizar_stage'
     _description = 'Productos a cotizar Stages'
     _order = 'x_studio_sequence, id'
+    # Por qué: el campo se llama x_name (herencia Studio), sin _rec_name
+    # Odoo busca 'name' y muestra el ID en dropdowns/many2one
+    _rec_name = 'x_name'
 
     x_name = fields.Char('Nombre de la etapa', required=True)
     x_studio_sequence = fields.Integer('Secuencia')
@@ -19,6 +22,12 @@ class ProductosACotizar(models.Model):
     _description = 'Productos a cotizar'
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'x_studio_sequence, id'
+    # Por qué: x_name en vez de name (herencia Studio) → sin esto los many2one muestran IDs
+    _rec_name = 'x_name'
+    # Por qué: el campo de archivado se llama x_active (Studio), no active.
+    # Sin _active_name el ORM no filtra archivados automáticamente
+    # y active_test=False no tiene efecto.
+    _active_name = 'x_active'
 
     # --- Campos base ---
     x_name = fields.Char('Descripción', required=True)
@@ -99,10 +108,12 @@ class ProductosACotizar(models.Model):
         last_stage = self.env['x_productos_a_cotizar_stage'].search(
             [], order='x_studio_sequence desc, id desc', limit=1,
         )
-        vals = {'x_studio_fecha_en_listo': fields.Date.today()}
-        if last_stage:
-            vals['x_studio_stage_id'] = last_stage.id
-        self.write(vals)
+        if not last_stage:
+            raise UserError("No hay etapas configuradas. Crear al menos una etapa.")
+        self.write({
+            'x_studio_fecha_en_listo': fields.Date.today(),
+            'x_studio_stage_id': last_stage.id,
+        })
 
     def action_cotizaciones(self):
         """Abre presupuestos vinculados o crea nuevos para los seleccionados.

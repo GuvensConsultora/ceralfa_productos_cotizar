@@ -3,6 +3,7 @@
 # vinculados a cada línea del SO.
 # Patrón: herencia de modelo + override create/write para sync automático.
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 
 class SaleOrderLine(models.Model):
@@ -41,14 +42,25 @@ class SaleOrderLine(models.Model):
         """Crea, reactiva o archiva registros en x_productos_a_cotizar
         según el estado del toggle x_pedir_cotizacion en cada línea.
         """
+        if not self:
+            return
         Cotizar = self.env['x_productos_a_cotizar'].sudo()
 
+        # Por qué: una sola búsqueda para todas las líneas en vez de N queries.
+        # active_test=False funciona gracias a _active_name='x_active' en el modelo.
+        all_existing = Cotizar.with_context(active_test=False).search([
+            ('x_studio_presupuesto_de_vtas', 'in', self.order_id.ids),
+            ('x_studio_linea_ppto_vtas', 'in', self.ids),
+        ])
+        # Por qué: indexar por (order_id, line_id) para lookup O(1) por línea
+        existing_map = {
+            (rec.x_studio_presupuesto_de_vtas.id, rec.x_studio_linea_ppto_vtas): rec
+            for rec in all_existing
+        }
+
+        to_create = []
         for line in self:
-            # Por qué: búsqueda con active_test=False para encontrar archivados también
-            existing = Cotizar.with_context(active_test=False).search([
-                ('x_studio_presupuesto_de_vtas', '=', line.order_id.id),
-                ('x_studio_linea_ppto_vtas', '=', line.id),
-            ], limit=1)
+            existing = existing_map.get((line.order_id.id, line.id))
 
             if line.x_pedir_cotizacion:
                 if existing:
@@ -56,12 +68,15 @@ class SaleOrderLine(models.Model):
                     if not existing.x_active:
                         existing.x_active = True
                 else:
-                    # Por qué: crear nuevo registro con mapeo de campos SO line → cotizar
-                    Cotizar.create(line._prepare_producto_a_cotizar_vals())
+                    # Por qué: acumular vals para crear en batch
+                    to_create.append(line._prepare_producto_a_cotizar_vals())
             else:
                 # Por qué: toggle desactivado → archivar si existía activo
                 if existing and existing.x_active:
                     existing.x_active = False
+
+        if to_create:
+            Cotizar.create(to_create)
 
     def _prepare_producto_a_cotizar_vals(self):
         """Prepara el dict de valores para crear un x_productos_a_cotizar
@@ -72,6 +87,8 @@ class SaleOrderLine(models.Model):
         first_stage = self.env['x_productos_a_cotizar_stage'].search(
             [], order='x_studio_sequence, id', limit=1,
         )
+        if not first_stage:
+            raise UserError("No hay etapas configuradas en 'Productos a Cotizar'. Crear al menos una.")
         return {
             'x_name': self.name or (self.product_id.name if self.product_id else ''),
             'x_studio_producto': self.product_id.product_tmpl_id.id if self.product_id else False,
@@ -79,7 +96,7 @@ class SaleOrderLine(models.Model):
             'x_studio_cliente': self.order_id.partner_id.id,
             'x_studio_presupuesto_de_vtas': self.order_id.id,
             'x_studio_linea_ppto_vtas': self.id,
-            'x_studio_stage_id': first_stage.id if first_stage else False,
+            'x_studio_stage_id': first_stage.id,
             'x_studio_kanban_state': 'draft',
             'x_studio_currency_id': self.order_id.currency_id.id,
             'x_studio_val_vtas_calc': self.price_subtotal,
