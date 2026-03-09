@@ -259,7 +259,7 @@
     <menuitem id="x_productos_a_cotizar_purchase_menu"
               name="Productos a Cotizar"
               action="x_productos_a_cotizar_action"
-              parent="purchase.menu_procurement_management"
+              parent="purchase.menu_purchase_root"
               sequence="30"/>
 
 </odoo>
