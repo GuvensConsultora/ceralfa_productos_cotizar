@@ -100,6 +100,13 @@ class ProductosACotizar(models.Model):
     # Acciones (reemplazan automatizaciones Studio v17)
     # =================================================================
 
+    def action_esperando_precio(self):
+        """Marca los registros como 'Cotización cargada, esperando precio'.
+        Por qué: estado intermedio entre borrador y listo — el comprador ya cargó
+                 la cotización pero aún no tiene respuesta de precio del proveedor.
+        """
+        self.write({'x_studio_kanban_state': 'sent'})
+
     def action_marcar_listo(self):
         """Marca los registros seleccionados como 'Listo'.
         Setea fecha_en_listo = hoy y mueve a la última etapa por secuencia.

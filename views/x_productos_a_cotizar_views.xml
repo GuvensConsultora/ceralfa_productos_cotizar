@@ -41,6 +41,18 @@
         <field name="arch" type="xml">
             <form string="Producto a Cotizar">
                 <header>
+                    <!-- Por qué: botón visible solo en borrador para marcar
+                         que la cotización fue enviada al proveedor. -->
+                    <button name="action_esperando_precio"
+                            string="Cotización cargada, esperando precio"
+                            type="object"
+                            class="btn-primary"
+                            invisible="x_studio_kanban_state != 'draft'"/>
+                    <button name="action_marcar_listo"
+                            string="Marcar como Listo"
+                            type="object"
+                            class="btn-success"
+                            invisible="x_studio_kanban_state not in ('draft', 'sent')"/>
                     <field name="x_studio_stage_id" widget="statusbar"
                            clickable="1"/>
                 </header>

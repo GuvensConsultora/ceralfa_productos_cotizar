@@ -5,6 +5,15 @@
          el dropdown "Acción" al seleccionar registros en la vista lista.
          Reemplaza las automatizaciones de Studio v17. -->
 
+    <record id="action_server_esperando_precio" model="ir.actions.server">
+        <field name="name">Cotización cargada, esperando precio</field>
+        <field name="model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_esperando_precio()</field>
+    </record>
+
     <record id="action_server_marcar_listo" model="ir.actions.server">
         <field name="name">Marcar como Listo</field>
         <field name="model_id" ref="model_x_productos_a_cotizar"/>
