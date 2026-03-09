@@ -248,13 +248,6 @@
         </field>
     </record>
 
-    <!-- Menú bajo Ventas → Productos a Cotizar -->
-    <menuitem id="x_productos_a_cotizar_menu"
-              name="Productos a Cotizar"
-              action="x_productos_a_cotizar_action"
-              parent="sale.sale_order_menu"
-              sequence="30"/>
-
     <!-- Menú bajo Compras → Productos a Cotizar -->
     <menuitem id="x_productos_a_cotizar_purchase_menu"
               name="Productos a Cotizar"
