@@ -41,16 +41,17 @@
         <field name="arch" type="xml">
             <form string="Producto a Cotizar">
                 <header>
-                    <!-- Por qué: botón visible solo en borrador para marcar
-                         que la cotización fue enviada al proveedor. -->
-                    <button name="action_esperando_precio"
+                    <!-- Por qué: type="action" refiere a ir.actions.server por xmlid.
+                         Más robusto que type="object" que valida el método Python
+                         al parsear la vista (falla si el ORM no cargó el modelo aún). -->
+                    <button name="%(action_server_esperando_precio)d"
                             string="Cotización cargada, esperando precio"
-                            type="object"
+                            type="action"
                             class="btn-primary"
                             invisible="x_studio_kanban_state != 'draft'"/>
-                    <button name="action_marcar_listo"
+                    <button name="%(action_server_marcar_listo)d"
                             string="Marcar como Listo"
-                            type="object"
+                            type="action"
                             class="btn-success"
                             invisible="x_studio_kanban_state not in ('draft', 'sent')"/>
                     <field name="x_studio_stage_id" widget="statusbar"
