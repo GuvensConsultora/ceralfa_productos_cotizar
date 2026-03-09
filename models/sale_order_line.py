@@ -11,6 +11,15 @@ class SaleOrderLine(models.Model):
 
     x_pedir_cotizacion = fields.Boolean('Pedir Cotización', default=False)
 
+    def action_ver_historial_precios(self):
+        """Abre wizard con últimas 10 operaciones de este producto + cliente."""
+        self.ensure_one()
+        return self.env['historial.precios.wizard'].action_open_historial(
+            product_id=self.product_id.id,
+            partner_id=self.order_id.partner_id.id,
+            origin='sale',
+        )
+
     # -----------------------------------------------------------------
     # CRUD overrides — sincronizan x_productos_a_cotizar con el toggle
     # -----------------------------------------------------------------

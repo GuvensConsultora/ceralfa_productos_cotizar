@@ -8,8 +8,10 @@
     'depends': ['mail', 'product', 'sale', 'purchase'],
     'data': [
         'security/ir.model.access.csv',
+        'wizards/historial_precios_wizard_views.xml',
         'views/x_productos_a_cotizar_views.xml',
         'views/sale_order_line_views.xml',
+        'views/purchase_order_line_views.xml',
         'data/server_actions.xml',
     ],
     'installable': True,

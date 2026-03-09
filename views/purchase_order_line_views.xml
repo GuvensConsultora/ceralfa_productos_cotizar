@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Por qué: agrega botón historial de precios en las líneas de compra.
+         Misma lógica que en ventas pero busca operaciones con el proveedor. -->
+    <record id="view_purchase_order_form_inherit_historial" model="ir.ui.view">
+        <field name="name">purchase.order.form.inherit.historial</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']//field[@name='product_qty']" position="after">
+                <button name="action_ver_historial_precios"
+                        type="object"
+                        icon="fa-history"
+                        title="Ver historial de precios"
+                        class="btn-link"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

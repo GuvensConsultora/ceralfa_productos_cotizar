@@ -3,3 +3,5 @@ access_x_productos_cotizar_admin,x_productos_a_cotizar admin,model_x_productos_a
 access_x_productos_cotizar_user,x_productos_a_cotizar user,model_x_productos_a_cotizar,base.group_user,1,1,1,0
 access_x_productos_cotizar_stage_admin,x_productos_a_cotizar_stage admin,model_x_productos_a_cotizar_stage,base.group_system,1,1,1,1
 access_x_productos_cotizar_stage_user,x_productos_a_cotizar_stage user,model_x_productos_a_cotizar_stage,base.group_user,1,1,1,0
+access_historial_precios_wizard,historial.precios.wizard user,model_historial_precios_wizard,base.group_user,1,1,1,1
+access_historial_precios_wizard_line,historial.precios.wizard.line user,model_historial_precios_wizard_line,base.group_user,1,1,1,1
