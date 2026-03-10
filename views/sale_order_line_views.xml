@@ -7,7 +7,7 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='order_line']//field[@name='product_uom_qty']" position="after">
+            <xpath expr="//field[@name='order_line']/list/field[@name='product_uom_qty']" position="after">
                 <field name="x_pedir_cotizacion" widget="boolean_toggle"/>
                 <!-- Por qué: botón por línea que abre wizard con últimas 10
                      operaciones de ese producto + cliente. -->
