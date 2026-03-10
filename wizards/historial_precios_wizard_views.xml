@@ -18,6 +18,8 @@
                         <field name="quantity" string="Cantidad"/>
                         <field name="price_unit" string="Precio unitario"/>
                         <field name="price_total" string="Precio total"/>
+                        <!-- Por qué: columna estado para distinguir cotización/confirmada/cancelada -->
+                        <field name="order_state" string="Estado"/>
                         <field name="currency_id" column_invisible="1"/>
                     </list>
                 </field>

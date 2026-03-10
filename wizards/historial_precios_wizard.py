@@ -1,7 +1,26 @@
 # Por qué: wizard TransientModel que muestra las últimas 10 operaciones
 # de un producto con un partner (cliente o proveedor).
 # Se abre desde un botón en las líneas de presupuesto de venta o compra.
+# Incluye TODOS los estados (cotización, confirmada, cancelada) para dar
+# visibilidad completa del historial de negociación.
 from odoo import api, fields, models
+
+# Por qué: mapeo centralizado de state técnico → label legible.
+# Evita hardcodear strings en _compute_lines y facilita mantenimiento.
+SALE_STATE_LABELS = {
+    'draft': 'Cotización',
+    'sent': 'Cotización enviada',
+    'sale': 'Orden de venta',
+    'done': 'Bloqueada',
+    'cancel': 'Cancelado',
+}
+PURCHASE_STATE_LABELS = {
+    'draft': 'Solicitud de cotización',
+    'sent': 'Solicitud enviada',
+    'purchase': 'Orden de compra',
+    'done': 'Bloqueada',
+    'cancel': 'Cancelado',
+}
 
 
 class HistorialPreciosWizard(models.TransientModel):
@@ -38,16 +57,17 @@ class HistorialPreciosWizard(models.TransientModel):
         }
 
     def _compute_lines(self):
-        """Busca las últimas 10 líneas históricas según origen (venta/compra)."""
+        """Busca las últimas 10 líneas históricas según origen (venta/compra).
+        Incluye todos los estados para dar visibilidad completa."""
         self.ensure_one()
         LineWiz = self.env['historial.precios.wizard.line']
 
         if self.origin == 'sale':
-            # Por qué: buscar líneas de SO confirmadas del mismo producto y cliente.
+            # Por qué: incluir TODOS los estados (draft, sent, sale, done, cancel)
+            # para que el vendedor vea el historial completo de negociación.
             lines = self.env['sale.order.line'].search([
                 ('product_id', '=', self.product_id.id),
                 ('order_id.partner_id', '=', self.partner_id.id),
-                ('order_id.state', 'in', ('sale', 'done')),
             ], order='create_date desc', limit=10)
             for line in lines:
                 LineWiz.create({
@@ -59,13 +79,15 @@ class HistorialPreciosWizard(models.TransientModel):
                     'price_unit': line.price_unit,
                     'price_total': line.price_subtotal,
                     'currency_id': line.currency_id.id,
+                    # Por qué: traducir el state técnico a un label legible
+                    'order_state': SALE_STATE_LABELS.get(
+                        line.order_id.state, line.order_id.state),
                 })
         else:
-            # Por qué: buscar líneas de PO confirmadas del mismo producto y proveedor.
+            # Por qué: misma lógica para compras, sin filtro de estado.
             lines = self.env['purchase.order.line'].search([
                 ('product_id', '=', self.product_id.id),
                 ('order_id.partner_id', '=', self.partner_id.id),
-                ('order_id.state', 'in', ('purchase', 'done')),
             ], order='create_date desc', limit=10)
             for line in lines:
                 LineWiz.create({
@@ -77,6 +99,8 @@ class HistorialPreciosWizard(models.TransientModel):
                     'price_unit': line.price_unit,
                     'price_total': line.price_subtotal,
                     'currency_id': line.currency_id.id,
+                    'order_state': PURCHASE_STATE_LABELS.get(
+                        line.order_id.state, line.order_id.state),
                 })
 
 
@@ -92,3 +116,6 @@ class HistorialPreciosWizardLine(models.TransientModel):
     price_unit = fields.Monetary('Precio unitario', currency_field='currency_id')
     price_total = fields.Monetary('Precio total', currency_field='currency_id')
     currency_id = fields.Many2one('res.currency', string='Moneda')
+    # Por qué: mostrar el estado del presupuesto/orden para que el vendedor
+    # distinga entre cotizaciones, órdenes confirmadas y canceladas.
+    order_state = fields.Char('Estado')
