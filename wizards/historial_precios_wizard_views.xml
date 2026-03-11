@@ -10,7 +10,10 @@
                     <field name="product_id"/>
                     <field name="partner_id"/>
                 </group>
-                <field name="line_ids" readonly="1">
+
+                <!-- Sección 1: últimas 3 cotizaciones al MISMO cliente -->
+                <separator string="Últimas 3 cotizaciones a este cliente"/>
+                <field name="line_ids" readonly="1" nolabel="1">
                     <list>
                         <field name="order_name" string="Nro Cotización"/>
                         <field name="date" string="Fecha"/>
@@ -18,11 +21,29 @@
                         <field name="quantity" string="Cantidad"/>
                         <field name="price_unit" string="Precio unitario"/>
                         <field name="price_total" string="Precio total"/>
-                        <!-- Por qué: columna estado para distinguir cotización/confirmada/cancelada -->
                         <field name="order_state" string="Estado"/>
                         <field name="currency_id" column_invisible="1"/>
                     </list>
                 </field>
+
+                <!-- Sección 2: últimas 10 cotizaciones a CUALQUIER cliente -->
+                <separator string="Últimas 10 cotizaciones a cualquier cliente"/>
+                <field name="line_all_ids" readonly="1" nolabel="1">
+                    <list>
+                        <field name="order_name" string="Nro Cotización"/>
+                        <field name="date" string="Fecha"/>
+                        <!-- Por qué: en esta sección se muestra el cliente porque
+                             puede ser cualquiera, no solo el de la cotización actual -->
+                        <field name="partner_name" string="Cliente"/>
+                        <field name="product_name" string="Producto"/>
+                        <field name="quantity" string="Cantidad"/>
+                        <field name="price_unit" string="Precio unitario"/>
+                        <field name="price_total" string="Precio total"/>
+                        <field name="order_state" string="Estado"/>
+                        <field name="currency_id" column_invisible="1"/>
+                    </list>
+                </field>
+
                 <footer>
                     <button string="Cerrar" class="btn-primary" special="cancel"/>
                 </footer>
