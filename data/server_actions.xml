@@ -32,4 +32,15 @@
         <field name="code">action = records.action_cotizaciones()</field>
     </record>
 
+    <!-- Por qué: reemplaza la acción Studio v17 (ID 1043) que usaba uom_po_id
+         (removido en Odoo 19). Crea solicitudes de compra agrupadas por moneda + compañía. -->
+    <record id="action_server_crear_cotizacion_compra" model="ir.actions.server">
+        <field name="name">Crear Cotización de Compra</field>
+        <field name="model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_model_id" ref="model_x_productos_a_cotizar"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_crear_cotizacion_compra()</field>
+    </record>
+
 </odoo>

@@ -122,6 +122,106 @@ class ProductosACotizar(models.Model):
             'x_studio_stage_id': last_stage.id,
         })
 
+    def action_crear_cotizacion_compra(self):
+        """Crea solicitudes de cotización de COMPRA agrupadas por moneda + compañía.
+        Por qué: reemplaza la acción de servidor Studio v17 (ID 1043) que usaba
+        uom_po_id (removido en Odoo 19).
+        Patrón: agrupar registros → un PO por (currency, company) → vincular back.
+        """
+        if not self:
+            raise UserError("Seleccione al menos un registro.")
+
+        # Por qué: segunda etapa = "en proceso de cotización"
+        second_stage = self.env['x_productos_a_cotizar_stage'].search(
+            [], order='x_studio_sequence, id', limit=2,
+        )
+        target_stage = second_stage[-1] if len(second_stage) >= 2 else second_stage[:1]
+
+        PurchaseOrder = self.env['purchase.order']
+        created_orders = PurchaseOrder
+
+        # --- Agrupar por (moneda, compañía) ---
+        groups = {}
+        for rec in self:
+            key = (rec.x_studio_currency_id.id or False, rec.x_studio_compaia.id or False)
+            groups.setdefault(key, self.browse())
+            groups[key] |= rec
+
+        for (currency_id, company_id), recs in groups.items():
+            if not company_id:
+                continue
+
+            # Por qué: fecha de entrega más temprana del grupo como fecha de orden
+            recs_with_date = recs.filtered('x_studio_date_stop')
+            date_order = min(recs_with_date.mapped('x_studio_date_stop')) if recs_with_date else fields.Datetime.now()
+
+            # Por qué: res.company → partner_id para tener el res.partner correcto del proveedor
+            company = self.env['res.company'].browse(company_id)
+
+            order_vals = {
+                'partner_id': company.partner_id.id,
+                'currency_id': currency_id,
+                'company_id': company_id,
+                'date_order': date_order,
+                'order_line': [],
+            }
+
+            for rec in recs:
+                if not rec.x_studio_producto:
+                    continue
+                product = rec.x_studio_producto.product_variant_id
+                order_vals['order_line'].append((0, 0, {
+                    'product_id': product.id,
+                    'product_qty': rec.x_studio_cantidad or 1.0,
+                    'price_unit': rec.x_studio_producto.standard_price,
+                    # Por qué: uom_po_id no existe en v19, usamos uom_id del producto
+                    'product_uom': rec.x_studio_producto.uom_id.id,
+                    'name': rec.x_name,
+                    'date_planned': date_order,
+                    # Campos de vinculación con venta y producto a cotizar
+                    'x_studio_pto_de_vta': rec.x_studio_presupuesto_de_vtas.id,
+                    'x_studio_id_linea_or_vta': rec.x_studio_linea_ppto_vtas,
+                    'x_studio_id_prod_a_coti': rec.id,
+                }))
+
+            if not order_vals['order_line']:
+                continue
+
+            po = PurchaseOrder.create(order_vals)
+            created_orders |= po
+
+            # Por qué: vincular el PO y sus líneas back al registro de productos a cotizar
+            for po_line in po.order_line:
+                cotizar_rec = self.browse(po_line.x_studio_id_prod_a_coti)
+                if cotizar_rec:
+                    cotizar_rec.write({
+                        'x_studio_ppto_comp': po.id,
+                        'x_studio_linea_ppto_cpras': po_line.id,
+                    })
+
+            # Mover a la etapa de "en cotización"
+            if target_stage:
+                recs.write({'x_studio_stage_id': target_stage.id})
+
+        if not created_orders:
+            raise UserError("No se pudieron crear cotizaciones. Verifique que los registros tengan producto y compañía.")
+
+        # Por qué: si es una sola PO → abrir form; si son varias → lista
+        if len(created_orders) == 1:
+            return {
+                'type': 'ir.actions.act_window',
+                'res_model': 'purchase.order',
+                'view_mode': 'form',
+                'res_id': created_orders.id,
+            }
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'purchase.order',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', created_orders.ids)],
+            'name': 'Cotizaciones de Compra',
+        }
+
     def action_cotizaciones(self):
         """Abre presupuestos vinculados o crea nuevos para los seleccionados.
         - Líneas CON presupuesto → se abren los existentes.
