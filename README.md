@@ -223,13 +223,22 @@ Vendedor desactiva toggle → _sync_productos_a_cotizar()
 
 **Optimización**: Una sola búsqueda batch para todas las líneas, indexada por `(order_id, line_id)` para lookup O(1).
 
+#### `purchase.order.line` (heredado)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `x_studio_pto_de_vta` | Many2one(sale.order) | Ppto de venta vinculado |
+| `x_studio_id_linea_or_vta` | Integer | ID línea orden venta |
+| `x_studio_id_prod_a_coti` | Integer | ID producto a cotizar |
+
 ### 4.5 Acciones masivas (server actions)
 
 | Acción | Método | Efecto |
 |--------|--------|--------|
 | Cotización cargada, esperando precio | `action_esperando_precio()` | `kanban_state = 'sent'` |
 | Marcar como Listo | `action_marcar_listo()` | `fecha_en_listo = hoy` + última etapa |
-| Cotizaciones | `action_cotizaciones()` | Abre/crea presupuestos por cliente |
+| Cotizaciones | `action_cotizaciones()` | Abre/crea presupuestos venta por cliente |
+| **Crear Cotización de Compra** | `action_crear_cotizacion_compra()` | Crea PO agrupada por moneda + compañía |
 
 ### 4.6 Decisiones técnicas
 
@@ -252,7 +261,33 @@ Todos los usuarios internos: CRUD completo (TransientModel, se auto-limpia)
 
 ### 4.8 Verificación
 
-1. **Toggle**: Crear presupuesto → activar toggle en una línea → guardar → verificar que aparece en Compras → Productos a Cotizar.
-2. **Historial**: Clic en botón reloj → verificar que muestra las 10 últimas operaciones con columna Estado.
-3. **Acciones masivas**: Seleccionar registros en lista → ejecutar cada acción → verificar cambio de estado/etapa.
-4. **Cotizaciones**: Seleccionar registros sin presupuesto → Cotizaciones → verificar que se crea SO por cliente.
+#### Test 1: Toggle Pedir Cotización
+1. Crear presupuesto → activar toggle en una línea → guardar.
+2. Ir a Compras → Productos a Cotizar.
+3. **Esperado**: aparece registro con producto, cliente, cantidad y moneda de la SO.
+
+#### Test 2: Historial de Precios
+1. En una línea de presupuesto, clic en botón 🕐 (reloj).
+2. **Esperado**: wizard con últimas 10 operaciones del producto + cliente, con columna Estado.
+
+#### Test 3: Acciones masivas (Kanban)
+1. Seleccionar registros en vista lista.
+2. Ejecutar "Cotización cargada, esperando precio" → verificar `kanban_state = sent`.
+3. Ejecutar "Marcar como Listo" → verificar etapa = última + fecha_en_listo = hoy.
+
+#### Test 4: Cotizaciones de Venta
+1. Seleccionar registros sin presupuesto vinculado.
+2. Ejecutar acción "Cotizaciones".
+3. **Esperado**: se crea un SO por cliente con los productos seleccionados.
+
+#### Test 5: Crear Cotización de Compra
+1. Seleccionar registros en vista lista (con producto y compañía asignados).
+2. En dropdown "Acción" → **"Crear Cotización de Compra"**.
+3. **Esperado**: se crea PO agrupada por moneda + compañía, sin error.
+4. Los registros se vinculan al PO creado y avanzan de etapa.
+
+#### Test 6: Acción Studio vieja desactivada
+1. Ir a Ajustes → Técnico → Acciones de servidor.
+2. Buscar la acción que contiene `uom_po_id` en su código (ID 1043).
+3. **Acción requerida**: desactivarla o eliminarla.
+4. Verificar que solo aparece "Crear Cotización de Compra" (la nueva) en el dropdown.
